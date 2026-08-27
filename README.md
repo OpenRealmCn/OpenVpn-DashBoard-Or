@@ -48,17 +48,25 @@ cd web; npm run dev            # Vite :5173,已代理 /api 与 /d
 
 ## 部署(Debian 11+ / Ubuntu 20.04+)
 
-方式一:一键安装(从 GitHub Release 拉取,校验 SHA256SUMS,重复执行即为更新):
+方式一:管理脚本(从 GitHub Release 拉取,SHA256SUMS 强校验):
 
 ```bash
+# 安装或更新(自动判断)
 curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh | sudo bash
 ```
 
-指定版本或使用下载镜像:
+脚本子命令(安装后本机也可直接 `sudo ovpn-ctl` 进交互菜单):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh | sudo bash -s -- v0.3.0
-GH_MIRROR=https://your-mirror.example curl -fsSL .../install.sh | sudo GH_MIRROR=https://your-mirror.example bash
+SCRIPT=https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh
+curl -fsSL $SCRIPT | sudo bash -s -- install v0.3.0        # 安装指定版本
+curl -fsSL $SCRIPT | sudo bash -s -- update                # 更新面板(配置数据不动)
+curl -fsSL $SCRIPT | sudo bash -s -- status                # 查看状态
+curl -fsSL $SCRIPT | sudo bash -s -- uninstall --yes       # 卸载面板(保留数据与 OpenVPN)
+curl -fsSL $SCRIPT | sudo bash -s -- uninstall --purge --all --yes
+                                   # 面板 + 数据 + OpenVPN 部署(证书/防火墙规则/DNS drop-in)全部清理
+# 国内镜像下载(校验和优先直连 GitHub,镜像不可信也安全):
+GH_MIRROR=https://your-mirror.example curl -fsSL $SCRIPT | sudo GH_MIRROR=https://your-mirror.example bash
 ```
 
 方式二:自行构建后拷贝安装:
