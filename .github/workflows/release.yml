@@ -37,11 +37,12 @@ jobs:
           mkdir -p dist
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/ovpn-web-linux-amd64 ./cmd/ovpn-web
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/ovpn-web-linux-arm64 ./cmd/ovpn-web
+          cd dist && sha256sum ovpn-web-linux-amd64 ovpn-web-linux-arm64 > SHA256SUMS
 
       - name: 发布 Release(已存在则仅补传资产)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/ovpn-web-linux-amd64 dist/ovpn-web-linux-arm64 \
+          gh release create "$GITHUB_REF_NAME" dist/ovpn-web-linux-amd64 dist/ovpn-web-linux-arm64 dist/SHA256SUMS \
             --title "$GITHUB_REF_NAME" --generate-notes \
-          || gh release upload "$GITHUB_REF_NAME" dist/ovpn-web-linux-amd64 dist/ovpn-web-linux-arm64 --clobber
+          || gh release upload "$GITHUB_REF_NAME" dist/ovpn-web-linux-amd64 dist/ovpn-web-linux-arm64 dist/SHA256SUMS --clobber

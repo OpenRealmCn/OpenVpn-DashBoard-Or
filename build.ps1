@@ -32,6 +32,13 @@ go build -trimpath -ldflags "-s -w" -o dist/ovpn-web-linux-arm64 ./cmd/ovpn-web
 
 Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 
+Write-Host "==> 生成 SHA256SUMS" -ForegroundColor Cyan
+$sums = foreach ($f in 'ovpn-web-linux-amd64', 'ovpn-web-linux-arm64') {
+    (Get-FileHash "dist/$f" -Algorithm SHA256).Hash.ToLower() + '  ' + $f
+}
+# sha256sum -c 需要 LF 行尾
+[IO.File]::WriteAllText("$PSScriptRoot/dist/SHA256SUMS", ($sums -join "`n") + "`n")
+
 Write-Host "==> 本机调试版 bin/ovpn-web.exe" -ForegroundColor Cyan
 go build -o bin/ovpn-web.exe ./cmd/ovpn-web
 

@@ -48,6 +48,21 @@ cd web; npm run dev            # Vite :5173,已代理 /api 与 /d
 
 ## 部署(Debian 11+ / Ubuntu 20.04+)
 
+方式一:一键安装(从 GitHub Release 拉取,校验 SHA256SUMS,重复执行即为更新):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh | sudo bash
+```
+
+指定版本或使用下载镜像:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh | sudo bash -s -- v0.3.0
+GH_MIRROR=https://your-mirror.example curl -fsSL .../install.sh | sudo GH_MIRROR=https://your-mirror.example bash
+```
+
+方式二:自行构建后拷贝安装:
+
 ```bash
 scp dist/ovpn-web-linux-amd64 scripts/ovpn-web.service scripts/install-panel.sh root@server:/tmp/
 ssh root@server 'cd /tmp && sh install-panel.sh ./ovpn-web-linux-amd64'
