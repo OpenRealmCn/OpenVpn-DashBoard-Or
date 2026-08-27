@@ -1,12 +1,13 @@
 # OpenVpnTools Windows 构建脚本
-# 用法:
-#   .\build.ps1           # 前端 + 交叉编译 linux/amd64 与 linux/arm64
-#   .\build.ps1 -SkipWeb  # 跳过前端构建
+# 用法(仓库根目录执行):
+#   .\scripts\build.ps1           # 前端 + 交叉编译 linux/amd64 与 linux/arm64
+#   .\scripts\build.ps1 -SkipWeb  # 跳过前端构建
 param(
     [switch]$SkipWeb
 )
 $ErrorActionPreference = 'Stop'
-Set-Location $PSScriptRoot
+$root = Split-Path $PSScriptRoot -Parent
+Set-Location $root
 
 if (-not $SkipWeb) {
     Write-Host "==> 构建前端 (web/dist)" -ForegroundColor Cyan
@@ -37,7 +38,7 @@ $sums = foreach ($f in 'ovpn-web-linux-amd64', 'ovpn-web-linux-arm64') {
     (Get-FileHash "dist/$f" -Algorithm SHA256).Hash.ToLower() + '  ' + $f
 }
 # sha256sum -c 需要 LF 行尾
-[IO.File]::WriteAllText("$PSScriptRoot/dist/SHA256SUMS", ($sums -join "`n") + "`n")
+[IO.File]::WriteAllText("$root/dist/SHA256SUMS", ($sums -join "`n") + "`n")
 
 Write-Host "==> 本机调试版 bin/ovpn-web.exe" -ForegroundColor Cyan
 go build -o bin/ovpn-web.exe ./cmd/ovpn-web

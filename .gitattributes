@@ -1,0 +1,21 @@
+# 统一行尾,防止 Windows 提交把 Linux 侧脚本变成 CRLF
+* text=auto
+
+*.sh   text eol=lf
+*.go   text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+Makefile        text eol=lf
+*.service       text eol=lf
+
+*.ps1  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.ico  binary

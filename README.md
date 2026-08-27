@@ -1,136 +1,172 @@
-# OpenVpn-DashBoard-Or — OpenVPN Web 管理面板
+<div align="center">
 
-仓库:[OpenRealmCn/OpenVpn-DashBoard-Or](https://github.com/OpenRealmCn/OpenVpn-DashBoard-Or) · 许可证:MIT
+# OpenVpn-DashBoard-Or
 
-部署在 Debian/Ubuntu 服务器上的单二进制 Web 面板,覆盖 OpenVPN 从安装到日常运维的完整流程,并修正常见一键脚本的痛点。可从 [Releases](https://github.com/OpenRealmCn/OpenVpn-DashBoard-Or/releases) 直接下载 linux/amd64 与 linux/arm64 产物。
+**OpenVPN Web 管理面板** · 单二进制部署,安装、证书、用户、更新一站式搞定
 
-## 功能
+[![Release](https://img.shields.io/github/v/release/OpenRealmCn/OpenVpn-DashBoard-Or)](https://github.com/OpenRealmCn/OpenVpn-DashBoard-Or/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/OpenRealmCn/OpenVpn-DashBoard-Or/release.yml?label=release%20build)](https://github.com/OpenRealmCn/OpenVpn-DashBoard-Or/actions)
+[![License](https://img.shields.io/github/license/OpenRealmCn/OpenVpn-DashBoard-Or)](LICENSE)
+![Go](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go&logoColor=white)
+![Platform](https://img.shields.io/badge/platform-Debian%2011%2B%20%7C%20Ubuntu%2020.04%2B-orange)
 
-- **交互式安装向导**:自定义监听端口/协议/VPN 网段/推送 DNS/公网地址,SSE 实时日志,现代加密默认值(`tls-crypt`、AEAD、EC 证书、`dh none`)
-- **失败自动回滚**:write-ahead 回滚 journal,任一步失败按 LIFO 逆序恢复系统原状(文件、软件包、sysctl、防火墙规则、DNS 改动)
-- **DNS 安全处理**:
-  - 关闭 systemd-resolved 的 DNS Stub 一律通过 **drop-in**(`/etc/systemd/resolved.conf.d/99-openvpntools.conf`),绝不改写主配置,可一键恢复原状
-  - UDP 53 占用自动归类:resolved / 已知 DNS 服务 / 未知进程;**未知进程绝不自动停止**(后端不存在该 API)
-- **客户端证书管理**:秒建无密码或加密私钥证书、列表(V/R/E 状态与到期时间)、一键吊销(revoke + gen-crl,新连接立即拒绝)
-- **在线客户端**:实时列表(来源地址/VPN 地址/上下行流量/连接时长,解析 status.log),经 management unix socket 一键断开会话
-- **服务控制与版本更新**:面板内启动/停止/重启 OpenVPN;检查并升级 OpenVPN(apt)与 EasyRSA(GitHub 官方 SHA256 digest 校验 + bash -n + 完整保留 PKI,失败自动回退旧版本)
-- **二维码分享**:一次性高熵下载链接(默认 10 分钟、单次有效),手机扫码免登录导入 `.ovpn`
-- **状态检查**:服务状态、实际监听端口、IPv4 转发(runtime + 持久化)一键修复
-- **可靠下载**:EasyRSA 从 GitHub 拉取,TLS ≥ 1.2、指数退避重试、内置 SHA256 校验(可配镜像,镜像不可信也安全)、tar 防路径穿越、`bash -n` 语法检查后才执行
-- **子用户与权限**:管理员可创建子用户,按「查看 / 创建证书 / 吊销证书 / 安装 / 断开客户端 / 系统维护」六项细粒度授权,可随时修改并即时生效;每个子用户可设**有效证书数量上限**(0 = 不限);子用户只能下载/分享/吊销自己创建的证书,证书列表显示创建者
-- **面板安全**:首启强制设管理员密码(bcrypt)、JWT httpOnly Cookie、登录与下载限流、持久化审计日志(谁在何时做了什么,面板内可查)、自助修改密码、可选自签 HTTPS
-- **运维便利**:证书有效期可自定义(1-3650 天);一键导出备份(PKI + 配置 + 用户数据 tar.gz),支持上传恢复(被替换文件自动留底)
-- **IPv6**:安装向导可选启用(server-ipv6 + NAT66 + v6 转发持久化),为客户端提供 v6 出口
-- **面板 HTTPS 三模式**:关闭 / 自签名 / Let's Encrypt(绑定域名自动签发续期受信证书)
-- **面板自更新**:从 GitHub Release 检查新版,校验 GitHub 官方 SHA256 digest 后原子替换二进制,一键重启生效(systemd Restart=always)
+[快速开始](#快速开始) · [功能特性](#功能特性) · [管理脚本](#管理脚本) · [配置](#配置) · [开发与构建](#开发与构建) · [路线图](#路线图)
 
-## 构建
+</div>
 
-依赖:Go 1.22+、Node 18+。
+---
 
-```powershell
-# Windows(开发机)
-.\build.ps1        # 前端 + 测试 + 交叉编译出 dist/ovpn-web-linux-{amd64,arm64}
-```
+## 快速开始
+
+在 Debian 11+ / Ubuntu 20.04+ 服务器上执行(root):
 
 ```bash
-# Linux / macOS
-make               # 等价:make web && make linux
-```
-
-本地开发(Windows 即可,mock 平台不触碰真实系统):
-
-```powershell
-go run ./cmd/ovpn-web          # API + 内嵌前端,http://127.0.0.1:8686
-# 前端热更新:另开终端
-cd web; npm run dev            # Vite :5173,已代理 /api 与 /d
-```
-
-## 部署(Debian 11+ / Ubuntu 20.04+)
-
-方式一:管理脚本(从 GitHub Release 拉取,SHA256SUMS 强校验):
-
-```bash
-# 安装或更新(自动判断)
 curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh | sudo bash
 ```
 
-脚本子命令(安装后本机也可直接 `sudo ovpn-ctl` 进交互菜单):
+然后浏览器打开 `http://<服务器IP>:8686`:
+
+1. 设置管理员密码(≥ 8 位)
+2. 「安装向导」填好端口/协议/DNS → 预检通过后一键安装 OpenVPN
+3. 「客户端证书」创建证书 → 下载 `.ovpn` 或手机扫码导入
+
+> 安全建议:用防火墙限制面板端口来源,或在「面板设置」开启 HTTPS(自签 / Let's Encrypt)。
+
+## 功能特性
+
+**安装与回滚**
+
+- 交互式安装向导:自定义端口、UDP/TCP、VPN 网段、可选 IPv6(NAT66)、五种客户端 DNS 模式,SSE 实时日志
+- write-ahead 回滚 journal:任一步失败按 LIFO 逆序恢复原状(文件、软件包、sysctl、防火墙规则、DNS 改动),面板重启后残留可继续回滚
+- 现代加密默认值:`tls-crypt`、AEAD(AES-GCM)、EC 证书、`dh none`、CRL 校验
+
+**DNS 安全(不做鲁莽操作)**
+
+- 关闭 systemd-resolved 的 DNS Stub 一律走 **drop-in**(`/etc/systemd/resolved.conf.d/`),绝不改写主配置,可一键恢复
+- UDP 53 占用自动归类:resolved / 已知 DNS 服务 / 未知进程;**未知进程绝不自动停止**(后端不存在该 API)
+
+**证书与分享**
+
+- 秒建无密码或加密私钥证书,有效期可自定义(1-3650 天);吊销即 `revoke + gen-crl`,新连接立即被拒
+- 二维码一次性分享:高熵 token、默认 10 分钟、单次有效,手机扫码免登录导入
+- 在线客户端列表(来源/VPN 地址/流量/时长),经 management 接口一键断开
+
+**多用户与安全**
+
+- 子用户细粒度权限(查看/建证书/吊销/安装/断开/维护),证书数量配额,修改即时生效
+- 子用户只能操作自己创建的证书;持久化审计日志;登录与下载限流;bcrypt + JWT httpOnly Cookie
+
+**运维**
+
+- 服务启停、IPv4/IPv6 转发一键持久化、状态总览
+- 三级更新:OpenVPN(apt)、EasyRSA(GitHub Release + 官方 SHA256 digest 校验、保留 PKI)、面板自更新(原子替换 + 一键重启)
+- 备份导出 / 上传恢复(被替换文件自动留底);所有 GitHub 下载:TLS ≥ 1.2、退避重试、SHA256 强校验、tar 防穿越、`bash -n` 后才执行
+
+## 管理脚本
+
+`install.sh` 同时是管理脚本(安装后本机可直接 `sudo ovpn-ctl` 进交互菜单):
 
 ```bash
 SCRIPT=https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh
-curl -fsSL $SCRIPT | sudo bash -s -- install v0.3.0        # 安装指定版本
-curl -fsSL $SCRIPT | sudo bash -s -- update                # 更新面板(配置数据不动)
-curl -fsSL $SCRIPT | sudo bash -s -- status                # 查看状态
-curl -fsSL $SCRIPT | sudo bash -s -- uninstall --yes       # 卸载面板(保留数据与 OpenVPN)
+
+curl -fsSL $SCRIPT | sudo bash                              # 安装或更新(自动判断)
+curl -fsSL $SCRIPT | sudo bash -s -- install v0.3.0         # 安装指定版本
+curl -fsSL $SCRIPT | sudo bash -s -- update                 # 更新面板(配置数据不动)
+curl -fsSL $SCRIPT | sudo bash -s -- status                 # 查看状态
+curl -fsSL $SCRIPT | sudo bash -s -- uninstall --yes        # 卸载面板(保留数据与 OpenVPN)
 curl -fsSL $SCRIPT | sudo bash -s -- uninstall --purge --all --yes
-                                   # 面板 + 数据 + OpenVPN 部署(证书/防火墙规则/DNS drop-in)全部清理
-# 国内镜像下载(校验和优先直连 GitHub,镜像不可信也安全):
+                        # 面板 + 数据 + OpenVPN 部署(证书/防火墙规则/DNS drop-in)全部清理
+```
+
+国内镜像下载(校验和优先直连 GitHub,镜像不可信也安全):
+
+```bash
 GH_MIRROR=https://your-mirror.example curl -fsSL $SCRIPT | sudo GH_MIRROR=https://your-mirror.example bash
 ```
 
-方式二:自行构建后拷贝安装:
-
-```bash
-scp dist/ovpn-web-linux-amd64 scripts/ovpn-web.service scripts/install-panel.sh root@server:/tmp/
-ssh root@server 'cd /tmp && sh install-panel.sh ./ovpn-web-linux-amd64'
-```
-
-浏览器打开 `http://<服务器IP>:8686`:
-
-1. 首次访问设置管理员密码(≥ 8 位)
-2. 「安装向导」填写端口等参数 → 预检通过后开始安装
-3. 「客户端证书」创建证书 → 下载 `.ovpn` 或点「二维码」手机扫码导入
-4. 「仪表盘」检查服务/端口/转发状态,处理 DNS Stub
-
-安全建议:用防火墙限制面板端口来源;或在「面板设置」开启 HTTPS(自签)后通过 `https://` 访问;扫码需手机可达面板地址,可在设置页配置 `panel_url`。
+离线场景可用 `scripts/install-panel.sh` 从本地二进制安装。
 
 ## 配置
 
-默认 `/etc/openvpntools/config.yaml`(首启自动生成),示例见 `configs/example.yaml`。数据目录 `/var/lib/openvpntools` 存放回滚 journal、安装参数与自签证书。
+- 面板配置:`/etc/openvpntools/config.yaml`(首启自动生成,示例见 [configs/example.yaml](configs/example.yaml))
+- 数据目录:`/var/lib/openvpntools`(回滚 journal、子用户、审计日志、自签证书等)
+- HTTPS 三模式:关闭 / 自签名 / Let's Encrypt(绑定域名,自动签发续期,强制监听 443 并占用 80 做验证)
+- 服务管理:`systemctl status|restart ovpn-web`(单元为 `Restart=always`,支持面板自更新后自动拉起)
 
-## Linux 验收清单(建议在测试 VM 全量过一遍)
+## 开发与构建
 
-- [ ] 纯净 Ubuntu 22.04 / Debian 12 向导安装成功,客户端连通且 NAT 出网
-- [ ] 真机扫码导入 `.ovpn`,连接成功;同一链接第二次访问返回 410
-- [ ] 带密码证书导入时要求输入密码
-- [ ] 吊销后原客户端无法建立新连接
-- [ ] 人为制造失败(如安装中途占用端口/断网)→ 自动回滚后:`/etc/openvpn`、`/etc/sysctl.d`、iptables 规则、resolved drop-in 与 `/etc/resolv.conf` 均复原
-- [ ] dnsmasq 或 `nc -lup 53` 占用 53 时,预检正确归类且不停止对方进程
-- [ ] 仪表盘关闭 DNS Stub(drop-in 生成、53 释放、系统解析正常),恢复原状成功
-- [ ] 未登录访问所有 `/api/*` 返回 401
-- [ ] 子用户:仅授予「查看+创建证书」时,吊销/安装/维护接口返回 403;配额用满后创建被拒;只能下载自己创建的证书
-- [ ] 管理员修改子用户权限后,子用户无需重新登录即生效;禁用账号后其会话立即失效
+依赖 Go 1.22+ 与 Node 18+;Windows 上可完整开发调试(mock 平台不触碰真实系统):
 
-## 技术栈与结构
+```bash
+go run ./cmd/ovpn-web        # http://127.0.0.1:8686,mock 模式可演示全部流程
+cd web && npm run dev        # 前端热更新(已代理 /api 与 /d)
+```
 
-Go 1.22 + Gin(单二进制,`go:embed` 内嵌前端)/ React 18 + Vite + TypeScript + Ant Design 5(中文)。
+发布构建:
+
+```bash
+make                         # Linux/macOS:前端 + linux/{amd64,arm64}
+.\scripts\build.ps1          # Windows 同上,并生成 SHA256SUMS
+```
+
+推送 `v*` 标签会触发 GitHub Actions 自动构建并发布 Release(含 `SHA256SUMS`)。
+
+<details>
+<summary><b>项目结构</b></summary>
 
 ```
-cmd/ovpn-web        入口
+cmd/ovpn-web        入口(HTTP/自签/Let's Encrypt)
 internal/platform   系统抽象(linux 真实现 + mock,Windows 可全流程演示)
 internal/installer  安装引擎:steps、write-ahead journal、回滚、SSE 日志
 internal/dnsguard   resolved drop-in 管理、UDP 53 归类保护
 internal/download   GitHub 下载器(重试/TLS/SHA256/防穿越/bash -n)
 internal/easyrsa    EasyRSA 封装与 index.txt 解析
-internal/clients    证书业务:创建/吊销/.ovpn 生成
-internal/qrlink     一次性下载 token
-web/                前端
-scripts/            systemd unit 与部署脚本
+internal/clients    证书业务:创建/吊销/.ovpn/在线列表/归属配额
+internal/users      子用户与权限
+internal/updates    OpenVPN/EasyRSA/面板 三级更新
+internal/backup     备份恢复
+internal/audit      审计日志
+web/                React 18 + Vite + TS + Ant Design 5(中文)
+scripts/            systemd 单元、构建与离线安装脚本
+install.sh          在线管理脚本(安装/更新/卸载/状态)
 ```
 
-## 路线图与建议(欢迎按需实现)
+</details>
 
-- **流量统计与图表**:定期采样 status.log 落盘(SQLite 或时序文件),仪表盘展示每客户端历史流量曲线
-- **通知集成**:证书临近到期、服务掉线、安装失败时推送 Webhook / Telegram / 邮件
-- **TOTP 两步验证**:面板登录加一层动态口令
-- **客户端进阶**:ccd 固定 IP 分配、client-to-client 开关、按客户端限速(tc)
-- **多节点管理**:一个面板纳管多台 VPN 服务器(agent 模式)
-- **WireGuard 支持**:复用现有面板与用户体系,增加 wg 协议栈
+<details>
+<summary><b>Linux 验收清单</b>(建议在测试 VM 全量过一遍)</summary>
+
+- [ ] 纯净 Ubuntu 22.04 / Debian 12 向导安装成功,客户端连通且 NAT 出网
+- [ ] 启用 IPv6 安装后,客户端获得 v6 地址且可经 NAT66 出网
+- [ ] 真机扫码导入 `.ovpn`,连接成功;同一链接第二次访问返回 410
+- [ ] 带密码证书导入时要求输入密码;吊销后原客户端无法建立新连接
+- [ ] 人为制造失败(占用端口/断网)→ 自动回滚后 `/etc/openvpn`、`/etc/sysctl.d`、iptables、resolved drop-in 与 `/etc/resolv.conf` 均复原
+- [ ] dnsmasq 或 `nc -lup 53` 占用 53 时,预检正确归类且不停止对方进程
+- [ ] 仪表盘关闭 DNS Stub(drop-in 生成、53 释放、解析正常),恢复原状成功
+- [ ] 子用户:仅授予「查看+创建证书」时,吊销/安装/维护接口 403;配额用满创建被拒;只能下载自己创建的证书
+- [ ] 管理员修改子用户权限即时生效;禁用账号后其会话立即失效
+- [ ] 备份导出 → 篡改/删除文件 → 上传恢复后完整复原,OpenVPN 自动重启
+- [ ] 面板自更新到新 Release 后一键重启生效(systemd 自动拉起)
+- [ ] 未登录访问所有 `/api/*` 返回 401
+
+</details>
+
+## 路线图
+
+- 流量统计与历史图表(采样 status.log 落盘,仪表盘曲线)
+- 通知集成:证书到期、服务掉线、安装失败推送 Webhook / Telegram / 邮件
+- TOTP 两步验证
+- 客户端进阶:ccd 固定 IP、client-to-client 开关、按客户端限速
+- 多节点管理(一个面板纳管多台 VPN 服务器)
+- WireGuard 协议支持
 
 ## 已知限制
 
 - 仅支持全新安装(检测到已有 `server.conf` 时拒绝,避免破坏手工部署)
 - `self` DNS 模式(resolved 服务 VPN 客户端)需要 systemd ≥ 247(Debian 11+ / Ubuntu 22.04+)
 - 分享 token 为内存态,面板重启后需重新生成(设计如此)
-- "断开在线客户端"依赖 server.conf 中的 management 配置,由本面板安装的实例自带;手工部署的旧配置不支持(界面会提示)
+- 「断开在线客户端」依赖本面板写入的 management 配置,手工部署的旧配置不支持(界面会提示)
+
+## License
+
+[MIT](LICENSE) © OpenRealmCn
