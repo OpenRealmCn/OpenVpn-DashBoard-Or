@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenVpnTools Web Panel
+Documentation=https://github.com/OpenVPN/easy-rsa
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 面板需要 root:安装软件包、写 /etc、控制 systemd 服务
+ExecStart=/usr/local/bin/ovpn-web -config /etc/openvpntools/config.yaml
+# always:支持面板自更新后经 /api/panel/restart 干净退出并自动拉起
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

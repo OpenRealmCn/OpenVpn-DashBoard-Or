@@ -1,0 +1,21 @@
+# OpenVpnTools 面板配置示例(默认路径 /etc/openvpntools/config.yaml)
+# 首次启动会自动生成本文件并补全 jwt_secret。
+
+# 面板监听地址
+listen: 0.0.0.0:8686
+
+# 数据目录:回滚 journal、安装参数、自签证书等
+data_dir: /var/lib/openvpntools
+
+# 二维码使用的外部地址(手机需可达);留空则用浏览器当前地址
+panel_url: ""
+
+# GitHub 下载镜像前缀,留空直连;内置 SHA256 校验,镜像不可信也安全
+# 例: https://ghproxy.example.com/https://github.com 的形式则填 https://ghproxy.example.com
+github_mirror: ""
+
+# HTTPS:开启后若未指定证书,将自动生成自签名证书到数据目录
+tls:
+  enabled: false
+  cert_file: ""
+  key_file: ""

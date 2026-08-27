@@ -1,0 +1,15 @@
+# 构建产物
+/bin/
+/dist/
+
+# 本地开发数据(含密钥与凭据,严禁提交)
+/devdata/
+
+# 前端
+node_modules/
+web/dist/*
+!web/dist/index.html
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
