@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,8 +18,21 @@ import (
 
 const identKey = "ovpn-identity"
 
-// requireAuth 校验 Cookie 并把实时解析的身份放入请求上下文。
+// requireAuth 校验 Cookie(或主节点的 Bearer node_token)并把身份放入上下文。
 func (s *Server) requireAuth(c *gin.Context) {
+	// 主节点接管:Authorization: Bearer <node_token>(常量时间比较)
+	if ah := c.GetHeader("Authorization"); strings.HasPrefix(ah, "Bearer ") {
+		bearer := strings.TrimPrefix(ah, "Bearer ")
+		nt := s.cfg.Snapshot().NodeToken
+		if nt != "" && len(bearer) == len(nt) &&
+			subtle.ConstantTimeCompare([]byte(bearer), []byte(nt)) == 1 {
+			c.Set(identKey, auth.MasterIdentity())
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "节点令牌无效"})
+		return
+	}
 	tok, err := c.Cookie(auth.CookieName)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "未登录或会话已过期"})

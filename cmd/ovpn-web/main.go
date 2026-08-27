@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -20,6 +23,7 @@ import (
 	"openvpntools/internal/audit"
 	"openvpntools/internal/auth"
 	"openvpntools/internal/config"
+	"openvpntools/internal/nodes"
 	"openvpntools/internal/platform"
 	"openvpntools/internal/platform/linux"
 	"openvpntools/internal/platform/mock"
@@ -30,11 +34,27 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", config.DefaultPath(), "配置文件路径")
+	genNodeToken := flag.Bool("gen-node-token", false, "生成/重置子节点接入令牌并打印后退出(供主节点绑定)")
 	flag.Parse()
 
 	cfgMgr, err := config.Load(*cfgPath)
 	if err != nil {
 		log.Fatalf("加载配置失败(%s): %v", *cfgPath, err)
+	}
+	if *genNodeToken {
+		buf := make([]byte, 32)
+		if _, err := rand.Read(buf); err != nil {
+			log.Fatalf("生成令牌失败: %v", err)
+		}
+		token := hex.EncodeToString(buf)
+		if err := cfgMgr.Update(func(c *config.Config) error {
+			c.NodeToken = token
+			return nil
+		}); err != nil {
+			log.Fatalf("保存令牌失败: %v", err)
+		}
+		fmt.Println(token)
+		return
 	}
 	cfg := cfgMgr.Snapshot()
 
@@ -56,10 +76,14 @@ func main() {
 		log.Fatalf("加载子用户失败: %v", err)
 	}
 	auditLog := audit.New(filepath.Join(cfg.DataDir, "audit.log"))
+	nodeStore, err := nodes.Load(filepath.Join(cfg.DataDir, "nodes.json"))
+	if err != nil {
+		log.Fatalf("加载节点表失败: %v", err)
+	}
 
 	authSvc := auth.New(cfgMgr, usersStore)
 	static, embedded := web.FS()
-	router := api.New(cfgMgr, authSvc, usersStore, plat, auditLog, mode).Router(static)
+	router := api.New(cfgMgr, authSvc, usersStore, plat, auditLog, nodeStore, mode).Router(static)
 
 	srv := &http.Server{
 		Addr:              cfg.Listen,

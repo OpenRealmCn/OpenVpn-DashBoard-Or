@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard'
 import InstallWizard from './pages/InstallWizard'
 import Clients from './pages/Clients'
 import Maintenance from './pages/Maintenance'
+import Nodes from './pages/Nodes'
 import Settings from './pages/Settings'
 import Users from './pages/Users'
 
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="install" element={<InstallWizard />} />
           <Route path="clients" element={<Clients />} />
           <Route path="maintenance" element={<Maintenance />} />
+          <Route path="nodes" element={<Nodes />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
         </Route>

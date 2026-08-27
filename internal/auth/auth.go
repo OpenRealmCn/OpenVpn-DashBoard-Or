@@ -43,6 +43,13 @@ func adminIdentity() Identity {
 	}
 }
 
+// MasterIdentity 是主节点经 node_token 接管本面板时的身份(等同管理员)。
+func MasterIdentity() Identity {
+	id := adminIdentity()
+	id.Username = "node-master"
+	return id
+}
+
 type claims struct {
 	Admin bool `json:"adm"`
 	jwt.RegisteredClaims

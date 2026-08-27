@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { App as AntApp, Button, Dropdown, Form, Input, Layout, Menu, Modal, Space, Tag } from 'antd'
 import {
+  ClusterOutlined,
   DashboardOutlined,
   KeyOutlined,
   LogoutOutlined,
@@ -29,6 +30,7 @@ const allMenus: MenuDef[] = [
   { key: '/install', icon: <RocketOutlined />, label: '安装向导', perm: 'install' },
   { key: '/clients', icon: <SafetyCertificateOutlined />, label: '客户端证书', perm: 'view' },
   { key: '/maintenance', icon: <ToolOutlined />, label: '系统维护', perm: 'maintain' },
+  { key: '/nodes', icon: <ClusterOutlined />, label: '节点管理', adminOnly: true },
   { key: '/users', icon: <TeamOutlined />, label: '用户管理', adminOnly: true },
   { key: '/settings', icon: <SettingOutlined />, label: '面板设置', adminOnly: true },
 ]

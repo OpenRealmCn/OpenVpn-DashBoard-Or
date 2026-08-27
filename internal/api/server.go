@@ -18,6 +18,7 @@ import (
 	"openvpntools/internal/config"
 	"openvpntools/internal/dnsguard"
 	"openvpntools/internal/installer"
+	"openvpntools/internal/nodes"
 	"openvpntools/internal/platform"
 	"openvpntools/internal/qrlink"
 	"openvpntools/internal/updates"
@@ -30,26 +31,30 @@ type Server struct {
 	users   *users.Store
 	plat    platform.Platform
 	dns     *dnsguard.Guard
-	engine  *installer.Engine
-	clients *clients.Manager
-	qr      *qrlink.Store
-	updates *updates.Manager
-	audit   *audit.Logger
-	mode    string // linux / mock,状态页展示用
+	engine    *installer.Engine
+	clients   *clients.Manager
+	qr        *qrlink.Store
+	updates   *updates.Manager
+	audit     *audit.Logger
+	nodes     *nodes.Store
+	joinCodes *nodes.JoinCodes
+	mode      string // linux / mock,状态页展示用
 }
 
 func New(cfg *config.Manager, authSvc *auth.Service, us *users.Store,
-	plat platform.Platform, auditLog *audit.Logger, mode string) *Server {
+	plat platform.Platform, auditLog *audit.Logger, nodeStore *nodes.Store, mode string) *Server {
 	dns := dnsguard.New(plat)
 	simulate := mode == "mock"
 	return &Server{
 		cfg: cfg, auth: authSvc, users: us, plat: plat, dns: dns,
-		engine:  installer.NewEngine(plat, dns, cfg, simulate),
-		clients: clients.New(plat, simulate),
-		qr:      qrlink.New(qrlink.DefaultTTL),
-		updates: updates.New(plat, cfg, simulate),
-		audit:   auditLog,
-		mode:    mode,
+		engine:    installer.NewEngine(plat, dns, cfg, simulate),
+		clients:   clients.New(plat, simulate),
+		qr:        qrlink.New(qrlink.DefaultTTL),
+		updates:   updates.New(plat, cfg, simulate),
+		audit:     auditLog,
+		nodes:     nodeStore,
+		joinCodes: nodes.NewJoinCodes(),
+		mode:      mode,
 	}
 }
 
@@ -62,9 +67,14 @@ func (s *Server) Router(static fs.FS) *gin.Engine {
 	r.POST("/api/setup", rateLimit(10, time.Minute), s.handleSetup)
 	r.POST("/api/login", rateLimit(10, time.Minute), s.handleLogin)
 
+	// 子节点自注册(凭一次性绑定码)
+	r.POST("/api/nodes/register", rateLimit(10, time.Minute), s.handleNodeRegister)
+
 	authed := r.Group("/api", s.requireAuth)
 	authed.POST("/logout", s.handleLogout)
 	authed.POST("/auth/password", s.handleChangePassword)
+	// 主节点健康探测(Bearer node_token 即为管理员身份)
+	authed.GET("/node/ping", s.handleNodePing)
 
 	view := authed.Group("", s.requirePerm("查看", func(p users.Perms) bool { return p.View }))
 	{
@@ -124,6 +134,13 @@ func (s *Server) Router(static fs.FS) *gin.Engine {
 		adm.POST("/backup/restore", s.handleRestore)
 		adm.POST("/update/panel", s.handleUpgradePanel)
 		adm.POST("/panel/restart", s.handlePanelRestart)
+		adm.GET("/nodes", s.handleNodeList)
+		adm.POST("/nodes", s.handleNodeAdd)
+		adm.PUT("/nodes/:id", s.handleNodeUpdate)
+		adm.DELETE("/nodes/:id", s.handleNodeDelete)
+		adm.POST("/nodes/joincode", s.handleNodeJoinCode)
+		adm.POST("/nodes/batch", s.handleNodeBatch)
+		adm.Any("/nodes/:id/proxy/*rest", s.handleNodeProxy)
 	}
 
 	// 扫码免登录一次性下载(token 即凭证,全局限流防爆破)

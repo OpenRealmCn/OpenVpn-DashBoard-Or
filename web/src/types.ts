@@ -176,6 +176,39 @@ export interface OnlineClient {
   since: string
 }
 
+export interface NodeHealth {
+  reachable: boolean
+  version: string
+  mode: string
+  installed: boolean
+  serviceActive: boolean
+  online: number
+  error?: string
+}
+
+export interface NodeRow {
+  id: string
+  name: string
+  url: string
+  insecureTLS: boolean
+  addedAt: string
+  health: NodeHealth
+}
+
+export interface JoinCodeResp {
+  code: string
+  expiresAt: string
+  command: string
+}
+
+export interface BatchResult {
+  id: string
+  name: string
+  ok: boolean
+  status: number
+  body: string
+}
+
 export interface VersionInfo {
   panel: string
   panelLatest: string

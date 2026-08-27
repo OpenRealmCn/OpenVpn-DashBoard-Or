@@ -56,6 +56,12 @@ curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/ma
 - 子用户细粒度权限(查看/建证书/吊销/安装/断开/维护),证书数量配额,修改即时生效
 - 子用户只能操作自己创建的证书;持久化审计日志;登录与下载限流;bcrypt + JWT httpOnly Cookie
 
+**多节点管理**
+
+- 一个主面板纳管多台 VPN 服务器:健康总览(版本/服务/在线数)、任意 API 代理直达
+- 快捷绑定:主节点生成一次性绑定码(15 分钟),子节点一行命令完成安装 + 令牌生成 + 自注册
+- 批量下发:勾选多节点一键执行重启服务、检查更新、升级 OpenVPN/EasyRSA/面板等
+
 **运维**
 
 - 服务启停、IPv4/IPv6 转发一键持久化、状态总览
@@ -76,6 +82,8 @@ curl -fsSL $SCRIPT | sudo bash -s -- status                 # 查看状态
 curl -fsSL $SCRIPT | sudo bash -s -- uninstall --yes        # 卸载面板(保留数据与 OpenVPN)
 curl -fsSL $SCRIPT | sudo bash -s -- uninstall --purge --all --yes
                         # 面板 + 数据 + OpenVPN 部署(证书/防火墙规则/DNS drop-in)全部清理
+curl -fsSL $SCRIPT | sudo bash -s -- join http://主节点:8686 XXXX-XXXX-XXXX
+                        # 绑定为子节点(绑定码在主节点「节点管理 → 添加子节点」生成)
 ```
 
 国内镜像下载(校验和优先直连 GitHub,镜像不可信也安全):
@@ -157,7 +165,6 @@ install.sh          在线管理脚本(安装/更新/卸载/状态)
 - 通知集成:证书到期、服务掉线、安装失败推送 Webhook / Telegram / 邮件
 - TOTP 两步验证
 - 客户端进阶:ccd 固定 IP、client-to-client 开关、按客户端限速
-- 多节点管理(一个面板纳管多台 VPN 服务器)
 - WireGuard 协议支持
 
 ## 已知限制

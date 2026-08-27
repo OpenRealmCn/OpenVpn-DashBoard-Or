@@ -10,6 +10,8 @@
 #   ... | sudo bash -s -- uninstall --purge --all --yes
 #                                               连面板数据、OpenVPN 部署(证书/规则/DNS drop-in)一并清理
 #   ... | sudo bash -s -- status                查看状态
+#   ... | sudo bash -s -- join <主节点URL> <绑定码> [本节点URL]
+#                                               安装(如未装)并绑定到主节点,成为其子节点
 # 安装完成后本机可直接使用管理菜单:
 #   sudo ovpn-ctl
 # 镜像下载(校验和仍优先直连 GitHub):
@@ -252,6 +254,45 @@ cmd_uninstall() {
     info "卸载完成"
 }
 
+# cmd_join <主节点URL> <绑定码> [本节点URL]:快捷绑定为子节点
+cmd_join() {
+    local master="${1:-}" code="${2:-}" self_url="${3:-}"
+    { [ -n "$master" ] && [ -n "$code" ]; } || die "用法: join <主节点URL> <绑定码> [本节点URL]"
+    require_env
+    [ -f "$BIN" ] || cmd_install latest
+
+    info "生成本节点接入令牌(写入面板配置)…"
+    local token
+    token="$("$BIN" -config "$CONF_DIR/config.yaml" -gen-node-token | tail -n 1)"
+    [ -n "$token" ] || die "令牌生成失败"
+    systemctl restart ovpn-web
+    sleep 2
+
+    if [ -z "$self_url" ]; then
+        local ip port
+        ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}' || true)"
+        port="$(awk '/^listen:/ {print $2}' "$CONF_DIR/config.yaml" 2>/dev/null | sed 's/.*://' || true)"
+        [ -n "$ip" ] || die "无法探测本机地址,请以第三个参数显式提供本节点 URL"
+        self_url="http://$ip:${port:-8686}"
+    fi
+
+    local host payload resp http_code
+    host="$(hostname | tr -cd 'A-Za-z0-9._-')"
+    payload="$(printf '{"code":"%s","name":"%s","url":"%s","token":"%s"}' \
+        "$code" "${host:-node}" "$self_url" "$token")"
+    info "向主节点注册: $master(本节点 $self_url)…"
+    resp="$(curl -sS --connect-timeout 15 --retry 2 -w '\n%{http_code}' \
+        -X POST -H 'Content-Type: application/json' -d "$payload" \
+        "${master%/}/api/nodes/register" 2>&1 || true)"
+    http_code="$(printf '%s' "$resp" | tail -n 1)"
+    if [ "$http_code" = "200" ]; then
+        info "绑定成功!已成为主节点的子节点,可在主节点「节点管理」页看到本机"
+    else
+        printf '%s\n' "$resp" | head -n -1 >&2
+        die "绑定失败(HTTP ${http_code:-?}):请确认绑定码有效、且主节点能访问 $self_url"
+    fi
+}
+
 cmd_status() {
     require_env
     if [ -f "$BIN" ]; then
@@ -290,6 +331,7 @@ main() {
         install) cmd_install "${1:-latest}" ;;
         update) cmd_update "${1:-latest}" ;;
         uninstall) cmd_uninstall "$@" ;;
+        join) cmd_join "$@" ;;
         status) cmd_status ;;
         menu) menu ;;
         "")
@@ -300,7 +342,7 @@ main() {
                 cmd_install latest
             fi
             ;;
-        *) die "未知命令: $cmd(可用 install / update / uninstall / status / menu)" ;;
+        *) die "未知命令: $cmd(可用 install / update / uninstall / join / status / menu)" ;;
     esac
 }
 

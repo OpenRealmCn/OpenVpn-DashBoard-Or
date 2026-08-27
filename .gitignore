@@ -3,7 +3,7 @@
 /dist/
 
 # 本地开发数据(含密钥与凭据,严禁提交)
-/devdata/
+/devdata*/
 
 # 前端
 node_modules/

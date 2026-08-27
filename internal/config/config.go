@@ -42,6 +42,7 @@ type Config struct {
 	GithubMirror string `yaml:"github_mirror"` // GitHub 下载镜像前缀,空则直连
 	JWTSecret    string `yaml:"jwt_secret"`    // 首启自动生成
 	AdminHash    string `yaml:"admin_hash"`    // bcrypt;空 = 未初始化
+	NodeToken    string `yaml:"node_token"`    // 子节点接入令牌;空 = 不接受主节点接管
 	TLS          TLS    `yaml:"tls"`
 }
 
