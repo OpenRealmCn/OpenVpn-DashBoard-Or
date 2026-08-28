@@ -66,6 +66,16 @@ func (s *Server) requirePerm(name string, sel func(users.Perms) bool) gin.Handle
 	}
 }
 
+// requireNodeAccess 节点管理入口:管理员,或被分配了节点的子用户。
+func (s *Server) requireNodeAccess(c *gin.Context) {
+	ident := identity(c)
+	if !ident.IsAdmin && len(ident.NodeIDs) == 0 {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "没有可管理的节点"})
+		return
+	}
+	c.Next()
+}
+
 func (s *Server) requireAdmin(c *gin.Context) {
 	if !identity(c).IsAdmin {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "仅管理员可操作"})

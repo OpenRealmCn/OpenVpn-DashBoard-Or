@@ -45,14 +45,14 @@ export default function Settings() {
         <Form.Item
           name="panelUrl"
           label="面板外部地址"
-          tooltip="生成二维码时使用,手机需要能访问该地址;留空则使用当前浏览器地址"
+          tooltip="用于生成分享链接与二维码,需可被移动设备访问;留空时使用当前访问地址"
         >
           <Input placeholder="http://服务器IP:8686" allowClear />
         </Form.Item>
         <Form.Item
           name="githubMirror"
           label="GitHub 下载镜像"
-          tooltip="EasyRSA 下载镜像前缀,留空直连 GitHub;SHA256 校验保证镜像不可信也安全"
+          tooltip="下载镜像前缀,留空时直连 GitHub;所有下载内容均经 SHA256 完整性校验"
         >
           <Input placeholder="https://mirror.example.com/https://github.com" allowClear />
         </Form.Item>

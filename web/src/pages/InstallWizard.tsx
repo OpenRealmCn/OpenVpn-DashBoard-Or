@@ -248,7 +248,7 @@ export default function InstallWizard() {
                       name="enableIPv6"
                       label="启用 IPv6(NAT66)"
                       valuePropName="checked"
-                      tooltip="为 VPN 客户端提供 IPv6 出口:server-ipv6 + ip6tables MASQUERADE,需宿主机具备 IPv6"
+                      tooltip="为 VPN 客户端提供 IPv6 出口,要求服务器具备可用的 IPv6 网络"
                     >
                       <Switch />
                     </Form.Item>
@@ -271,7 +271,7 @@ export default function InstallWizard() {
                       { value: 'cloudflare', label: 'Cloudflare(1.1.1.1)' },
                       { value: 'google', label: 'Google(8.8.8.8)' },
                       { value: 'system', label: '本机当前上游 DNS' },
-                      { value: 'self', label: '本机 resolved 服务客户端(drop-in 方式)' },
+                      { value: 'self', label: '本机 systemd-resolved(经 drop-in 配置)' },
                       { value: 'custom', label: '自定义' },
                     ]}
                   />
@@ -297,7 +297,7 @@ export default function InstallWizard() {
                 <Form.Item
                   name="publicAddr"
                   label="服务器公网地址"
-                  tooltip="客户端 remote 使用;自动探测的是本机路由源地址,NAT 环境请改成真实公网 IP 或域名"
+                  tooltip="客户端的连接地址;自动探测值为本机路由源地址,NAT 环境下请填写真实公网 IP 或域名"
                   rules={[{ required: true, message: '请输入公网 IP 或域名' }]}
                 >
                   <Input placeholder="203.0.113.10 或 vpn.example.com" />

@@ -31,6 +31,7 @@ type Class string
 
 const (
 	ClassResolved Class = "resolved"  // systemd-resolved,可由本工具自动处理
+	ClassOpenVPN  Class = "openvpn"   // 本面板管理的 OpenVPN 实例(VPN 端口选了 53 的场景)
 	ClassKnownDNS Class = "known-dns" // 已知 DNS 服务,仅提示用户自行决策
 	ClassUnknown  Class = "unknown"   // 未知进程,绝不自动操作
 )
@@ -66,6 +67,8 @@ func Classify(p platform.PortInfo) Class {
 	switch {
 	case p.Unit == ResolvedUnit || strings.HasPrefix(comm, "systemd-resolve"):
 		return ClassResolved
+	case comm == "openvpn" || strings.HasPrefix(p.Unit, "openvpn-server@"):
+		return ClassOpenVPN
 	case knownDNSComms[comm] || knownDNSComms[p.Comm]:
 		return ClassKnownDNS
 	default:

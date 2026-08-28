@@ -14,6 +14,8 @@ func TestClassify(t *testing.T) {
 	}{
 		{"resolved 按 unit 识别", platform.PortInfo{Comm: "whatever", Unit: "systemd-resolved.service"}, ClassResolved},
 		{"resolved 按进程名识别", platform.PortInfo{Comm: "systemd-resolve"}, ClassResolved},
+		{"openvpn 按进程名识别为自身服务", platform.PortInfo{Comm: "openvpn"}, ClassOpenVPN},
+		{"openvpn 按 unit 识别为自身服务", platform.PortInfo{Comm: "x", Unit: "openvpn-server@server.service"}, ClassOpenVPN},
 		{"dnsmasq 是已知 DNS", platform.PortInfo{Comm: "dnsmasq", Unit: "dnsmasq.service"}, ClassKnownDNS},
 		{"unbound 是已知 DNS", platform.PortInfo{Comm: "unbound"}, ClassKnownDNS},
 		{"bind named 是已知 DNS", platform.PortInfo{Comm: "named"}, ClassKnownDNS},

@@ -121,6 +121,14 @@ func (s *Server) Router(static fs.FS) *gin.Engine {
 		maint.POST("/update/easyrsa", s.handleUpgradeEasyRSA)
 	}
 
+	// 节点管理:管理员全量;子用户仅限被分配的节点(接口内再按节点归属校验)
+	nodeGrp := authed.Group("", s.requireNodeAccess)
+	{
+		nodeGrp.GET("/nodes", s.handleNodeList)
+		nodeGrp.POST("/nodes/batch", s.handleNodeBatch)
+		nodeGrp.Any("/nodes/:id/proxy/*rest", s.handleNodeProxy)
+	}
+
 	adm := authed.Group("", s.requireAdmin)
 	{
 		adm.GET("/settings", s.handleGetSettings)
@@ -134,13 +142,10 @@ func (s *Server) Router(static fs.FS) *gin.Engine {
 		adm.POST("/backup/restore", s.handleRestore)
 		adm.POST("/update/panel", s.handleUpgradePanel)
 		adm.POST("/panel/restart", s.handlePanelRestart)
-		adm.GET("/nodes", s.handleNodeList)
 		adm.POST("/nodes", s.handleNodeAdd)
 		adm.PUT("/nodes/:id", s.handleNodeUpdate)
 		adm.DELETE("/nodes/:id", s.handleNodeDelete)
 		adm.POST("/nodes/joincode", s.handleNodeJoinCode)
-		adm.POST("/nodes/batch", s.handleNodeBatch)
-		adm.Any("/nodes/:id/proxy/*rest", s.handleNodeProxy)
 	}
 
 	// 扫码免登录一次性下载(token 即凭证,全局限流防爆破)

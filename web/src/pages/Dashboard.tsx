@@ -45,12 +45,18 @@ function occupantTag(o: Occupant) {
   switch (o.class) {
     case 'resolved':
       return <Tag color="blue">systemd-resolved</Tag>
+    case 'openvpn':
+      return (
+        <Tooltip title="当前 OpenVPN 实例的监听端口为 53,属正常占用">
+          <Tag color="green">OpenVPN(本服务)</Tag>
+        </Tooltip>
+      )
     case 'known-dns':
       return <Tag color="gold">已知 DNS 服务</Tag>
     default:
       return (
-        <Tooltip title="为安全起见,本工具不会自动停止未知进程,请自行确认后处理">
-          <Tag color="red">未知进程(不会自动停止)</Tag>
+        <Tooltip title="该进程不由本系统管理,不会被自动停止;请人工确认后再作处理">
+          <Tag color="red">外部进程</Tag>
         </Tooltip>
       )
   }

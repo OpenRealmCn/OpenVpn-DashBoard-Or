@@ -153,6 +153,8 @@ func precheckSelfDNS(ctx context.Context, plat platform.Platform, dns *dnsguard.
 		case dnsguard.ClassResolved:
 			// stub 只监听 127.0.0.53,与 VPN 网关地址不冲突
 			add("UDP 53", true, fmt.Sprintf("systemd-resolved stub 占用 %s(不冲突)", oc.Addr))
+		case dnsguard.ClassOpenVPN:
+			add("UDP 53", false, "OpenVPN 实例正在监听 53 端口,该 DNS 模式要求 53 空闲,请更换 VPN 端口或 DNS 模式")
 		case dnsguard.ClassKnownDNS:
 			add("UDP 53", false, fmt.Sprintf(
 				"已知 DNS 服务 %s(PID %d, %s)占用 %s:53;请自行调整其监听或换 DNS 模式,本工具不会代为停止",

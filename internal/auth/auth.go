@@ -34,6 +34,7 @@ type Identity struct {
 	IsAdmin   bool        `json:"isAdmin"`
 	Perms     users.Perms `json:"perms"`
 	CertLimit int         `json:"certLimit"` // 0 = 不限
+	NodeIDs   []string    `json:"nodeIds"`   // 子用户可管理的节点;管理员为全部
 }
 
 func adminIdentity() Identity {
@@ -137,7 +138,7 @@ func (s *Service) Validate(token string) (Identity, error) {
 	if u.Disabled {
 		return Identity{}, users.ErrDisabled
 	}
-	return Identity{Username: u.Username, Perms: u.Perms, CertLimit: u.CertLimit}, nil
+	return Identity{Username: u.Username, Perms: u.Perms, CertLimit: u.CertLimit, NodeIDs: u.NodeIDs}, nil
 }
 
 // ChangePassword 修改自己的密码(需验证旧密码)。

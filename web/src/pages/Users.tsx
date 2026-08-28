@@ -9,6 +9,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Switch,
   Table,
@@ -38,6 +39,7 @@ interface FormValues {
   password?: string
   permKeys: (keyof Perms)[]
   certLimit: number
+  nodeIds: string[]
   disabled?: boolean
 }
 
@@ -56,7 +58,14 @@ export default function Users() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<UserRow | null>(null) // null=关闭,username=''=新建
   const [saving, setSaving] = useState(false)
+  const [nodeOpts, setNodeOpts] = useState<{ label: string; value: string }[]>([])
   const [form] = Form.useForm<FormValues>()
+
+  useEffect(() => {
+    api<{ nodes: { id: string; name: string }[] | null }>('/api/nodes')
+      .then((res) => setNodeOpts((res.nodes ?? []).map((n) => ({ label: n.name, value: n.id }))))
+      .catch(() => setNodeOpts([]))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,9 +85,11 @@ export default function Users() {
 
   const openCreate = () => {
     form.setFieldsValue({
-      username: '', password: '', permKeys: ['view', 'certCreate'], certLimit: 5, disabled: false,
+      username: '', password: '', permKeys: ['view', 'certCreate'], certLimit: 5, nodeIds: [], disabled: false,
     })
-    setEditing({ username: '', perms: toPerms([]), certLimit: 0, certsUsed: 0, disabled: false, createdAt: '' })
+    setEditing({
+      username: '', perms: toPerms([]), certLimit: 0, certsUsed: 0, nodeIds: [], disabled: false, createdAt: '',
+    })
   }
 
   const openEdit = (u: UserRow) => {
@@ -87,6 +98,7 @@ export default function Users() {
       password: '',
       permKeys: permOptions.filter((p) => u.perms[p.key]).map((p) => p.key),
       certLimit: u.certLimit,
+      nodeIds: u.nodeIds ?? [],
       disabled: u.disabled,
     })
     setEditing(u)
@@ -102,7 +114,7 @@ export default function Users() {
           method: 'POST',
           body: JSON.stringify({
             username: v.username, password: v.password,
-            perms: toPerms(v.permKeys), certLimit: v.certLimit,
+            perms: toPerms(v.permKeys), certLimit: v.certLimit, nodeIds: v.nodeIds ?? [],
           }),
         })
         message.success('子用户已创建')
@@ -110,11 +122,11 @@ export default function Users() {
         await api(`/api/users/${encodeURIComponent(editing!.username)}`, {
           method: 'PUT',
           body: JSON.stringify({
-            perms: toPerms(v.permKeys), certLimit: v.certLimit,
+            perms: toPerms(v.permKeys), certLimit: v.certLimit, nodeIds: v.nodeIds ?? [],
             disabled: v.disabled, password: v.password || '',
           }),
         })
-        message.success('已保存(权限即时生效)')
+        message.success('已保存,权限即时生效')
       }
       setEditing(null)
       await load()
@@ -163,6 +175,23 @@ export default function Users() {
       width: 110,
       render: (_, u) => (u.certLimit > 0 ? `${u.certsUsed} / ${u.certLimit}` : `${u.certsUsed} / 不限`),
     },
+    {
+      title: '分配节点',
+      key: 'nodes',
+      width: 160,
+      render: (_, u) => {
+        const ids = u.nodeIds ?? []
+        if (ids.length === 0) return '-'
+        return (
+          <Space size={4} wrap>
+            {ids.map((id) => {
+              const opt = nodeOpts.find((o) => o.value === id)
+              return <Tag key={id}>{opt?.label ?? id}</Tag>
+            })}
+          </Space>
+        )
+      },
+    },
     { title: '创建时间', dataIndex: 'createdAt', width: 150 },
     {
       title: '操作',
@@ -203,7 +232,7 @@ export default function Users() {
       }
     >
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-        子用户按勾选的权限使用面板;下载/分享/吊销仅限自己创建的证书。权限与配额修改即时生效。
+        子账户仅可在授权范围内使用面板;证书的下载、分享与吊销仅限其本人创建的证书。权限、配额与节点分配的修改即时生效。
       </Typography.Paragraph>
       <Table<UserRow>
         rowKey="username"
@@ -249,6 +278,18 @@ export default function Users() {
           </Form.Item>
           <Form.Item name="certLimit" label="有效证书数量上限(0 = 不限)" rules={[{ required: true }]}>
             <InputNumber min={0} max={1000} style={{ width: 180 }} />
+          </Form.Item>
+          <Form.Item
+            name="nodeIds"
+            label="分配节点"
+            tooltip="被分配节点的用户可在「节点管理」中查看并操作对应子节点"
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder={nodeOpts.length ? '选择可管理的子节点' : '暂无子节点可分配'}
+              options={nodeOpts}
+            />
           </Form.Item>
           {!isCreate && (
             <Form.Item name="disabled" label="禁用账号" valuePropName="checked">

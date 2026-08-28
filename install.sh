@@ -54,6 +54,11 @@ confirm() {
     die "非交互环境执行卸载请追加 --yes"
 }
 
+# 全局临时目录,退出时统一清理
+# (不可用 RETURN trap:函数返回后 local 变量已销毁,set -u 下后续函数返回会触发 unbound variable)
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
+
 # TLS ≥ 1.2、证书校验、退避重试
 fetch() {
     curl -fL --proto '=https' --tlsv1.2 --retry 4 --retry-delay 2 \
@@ -139,7 +144,7 @@ panel_url_hint() {
 }
 
 cmd_install() {
-    local version="${1:-latest}" tmp bin_path
+    local version="${1:-latest}" bin_path
     require_env
     if [ -r /etc/os-release ]; then . /etc/os-release; fi
     case "${ID:-}" in
@@ -147,9 +152,7 @@ cmd_install() {
         *) warn "未识别的发行版「${ID:-unknown}」:面板可以运行,但安装 OpenVPN 仅支持 Debian/Ubuntu 系" ;;
     esac
 
-    tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"' RETURN
-    bin_path="$(download_verified "$version" "$tmp" | tail -n 1)"
+    bin_path="$(download_verified "$version" "$TMP_ROOT" | tail -n 1)"
 
     if [ -f "$BIN" ]; then
         info "检测到已安装,执行更新(配置与数据不受影响)…"

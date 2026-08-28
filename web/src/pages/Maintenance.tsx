@@ -290,8 +290,8 @@ export default function Maintenance() {
           </Descriptions>
           {!ver?.checkedRemote && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              点「检查更新」联网查询(apt 源 + GitHub API);EasyRSA 升级会校验 GitHub
-              官方 SHA256、通过 bash -n 语法检查并完整保留 PKI。
+              检查更新将查询系统软件源与 GitHub Releases;所有升级均经 SHA256 完整性校验,
+              EasyRSA 升级过程完整保留现有 PKI。
             </Typography.Text>
           )}
           <Space>
@@ -339,8 +339,8 @@ export default function Maintenance() {
         >
           <Space direction="vertical" size={8}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              导出 PKI(CA/证书/index)、server 配置、安装参数、子用户与证书归属;
-              面板自身的 config.yaml(含密钥)请另行备份。恢复时被替换的文件会自动留底。
+              导出内容包含 PKI(CA 与全部证书)、服务端配置、安装参数、子用户及证书归属数据;
+              面板主配置文件含密钥,请另行妥善备份。执行恢复时,被替换的文件将自动留存副本。
             </Typography.Text>
             <Space>
               <Button icon={<DownloadOutlined />} href="/api/backup">

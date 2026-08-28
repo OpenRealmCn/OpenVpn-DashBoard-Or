@@ -32,6 +32,7 @@ func (s *Server) handleSession(c *gin.Context) {
 				"perms":     ident.Perms,
 				"certLimit": ident.CertLimit,
 				"certsUsed": used,
+				"nodeIds":   ident.NodeIDs,
 			}
 		}
 	}

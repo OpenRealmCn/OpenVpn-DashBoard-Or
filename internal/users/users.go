@@ -31,6 +31,7 @@ type User struct {
 	Hash      string    `json:"hash"` // bcrypt,仅存储文件用,API 层不得外传
 	Perms     Perms     `json:"perms"`
 	CertLimit int       `json:"certLimit"` // 有效证书数上限,0 = 不限
+	NodeIDs   []string  `json:"nodeIds"`   // 分配给该用户管理的子节点
 	Disabled  bool      `json:"disabled"`
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -114,7 +115,7 @@ func (s *Store) Get(username string) (User, error) {
 	return *u, nil
 }
 
-func (s *Store) Create(username, password string, perms Perms, certLimit int) error {
+func (s *Store) Create(username, password string, perms Perms, certLimit int, nodeIDs []string) error {
 	if !usernameRe.MatchString(username) {
 		return ErrBadName
 	}
@@ -135,7 +136,7 @@ func (s *Store) Create(username, password string, perms Perms, certLimit int) er
 	}
 	s.users[username] = &User{
 		Username: username, Hash: string(hash), Perms: perms,
-		CertLimit: max(certLimit, 0), CreatedAt: time.Now(),
+		CertLimit: max(certLimit, 0), NodeIDs: nodeIDs, CreatedAt: time.Now(),
 	}
 	return s.saveLocked()
 }

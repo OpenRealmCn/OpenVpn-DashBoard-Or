@@ -13,6 +13,7 @@ export interface PanelUser {
   perms: Perms
   certLimit: number
   certsUsed: number
+  nodeIds: string[] | null
 }
 
 export interface Session {
@@ -27,6 +28,7 @@ export interface UserRow {
   perms: Perms
   certLimit: number
   certsUsed: number
+  nodeIds: string[] | null
   disabled: boolean
   createdAt: string
 }
@@ -54,7 +56,7 @@ export interface PortInfo {
   unit: string
 }
 
-export type OccupantClass = 'resolved' | 'known-dns' | 'unknown'
+export type OccupantClass = 'resolved' | 'openvpn' | 'known-dns' | 'unknown'
 
 export interface Occupant extends PortInfo {
   class: OccupantClass

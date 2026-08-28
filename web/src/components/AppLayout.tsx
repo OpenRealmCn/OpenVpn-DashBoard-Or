@@ -122,6 +122,8 @@ export default function AppLayout() {
   const menus = useMemo(
     () =>
       allMenus.filter((m) => {
+        // 节点管理:管理员或被分配了节点的用户可见
+        if (m.key === '/nodes') return !!session.user?.isAdmin || (session.user?.nodeIds?.length ?? 0) > 0
         if (m.adminOnly) return session.user?.isAdmin
         if (m.perm) return hasPerm(session, m.perm)
         return true

@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"openvpntools/internal/auth"
 	"openvpntools/internal/nodes"
 	"openvpntools/internal/openvpn"
 	"openvpntools/internal/version"
@@ -36,6 +37,19 @@ func (s *Server) handleNodePing(c *gin.Context) {
 	})
 }
 
+// nodeAllowed 管理员可管理全部节点;子用户仅限被分配的节点。
+func nodeAllowed(ident auth.Identity, id string) bool {
+	if ident.IsAdmin {
+		return true
+	}
+	for _, n := range ident.NodeIDs {
+		if n == id {
+			return true
+		}
+	}
+	return false
+}
+
 type nodeDTO struct {
 	ID          string       `json:"id"`
 	Name        string       `json:"name"`
@@ -45,9 +59,19 @@ type nodeDTO struct {
 	Health      nodes.Health `json:"health"`
 }
 
-// handleNodeList 列出节点并并发健康探测(令牌绝不外传)。
+// handleNodeList 列出节点并并发健康探测(令牌绝不外传);子用户仅见被分配的节点。
 func (s *Server) handleNodeList(c *gin.Context) {
+	ident := identity(c)
 	list := s.nodes.List()
+	if !ident.IsAdmin {
+		filtered := make([]nodes.Node, 0, len(list))
+		for _, n := range list {
+			if nodeAllowed(ident, n.ID) {
+				filtered = append(filtered, n)
+			}
+		}
+		list = filtered
+	}
 	out := make([]nodeDTO, len(list))
 	var wg sync.WaitGroup
 	for i, n := range list {
@@ -204,6 +228,10 @@ func (s *Server) handleNodeRegister(c *gin.Context) {
 
 // handleNodeProxy 把请求原样转发到子节点 /api/*(含 SSE 流式响应)。
 func (s *Server) handleNodeProxy(c *gin.Context) {
+	if !nodeAllowed(identity(c), c.Param("id")) {
+		abortErr(c, http.StatusForbidden, "没有该节点的管理权限")
+		return
+	}
 	n, err := s.nodes.Get(c.Param("id"))
 	if err != nil {
 		abortErr(c, http.StatusNotFound, err.Error())
@@ -282,6 +310,7 @@ func (s *Server) handleNodeBatch(c *gin.Context) {
 		return
 	}
 
+	ident := identity(c)
 	results := make([]batchResult, len(req.IDs))
 	sem := make(chan struct{}, 8)
 	var wg sync.WaitGroup
@@ -292,6 +321,11 @@ func (s *Server) handleNodeBatch(c *gin.Context) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			res := batchResult{ID: id}
+			if !nodeAllowed(ident, id) {
+				res.Body = "没有该节点的管理权限"
+				results[i] = res
+				return
+			}
 			n, err := s.nodes.Get(id)
 			if err != nil {
 				res.Body = err.Error()

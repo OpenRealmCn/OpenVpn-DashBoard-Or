@@ -271,7 +271,7 @@ export default function Clients() {
               },
             ]}
           >
-            <Input placeholder="如 phone-xiaoming" autoFocus />
+            <Input placeholder="例如 iphone-01" autoFocus />
           </Form.Item>
           <Form.Item
             name="expireDays"

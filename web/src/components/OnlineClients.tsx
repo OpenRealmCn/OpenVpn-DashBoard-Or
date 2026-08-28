@@ -43,7 +43,7 @@ export default function OnlineClients({ canKick = true }: { canKick?: boolean })
   const kick = async (cn: string) => {
     try {
       await api(`/api/online/${encodeURIComponent(cn)}/kick`, { method: 'POST' })
-      message.success(`已断开 ${cn}(证书仍有效,可重连;永久禁用请用吊销)`)
+      message.success(`已断开 ${cn} 的当前会话;如需永久禁用,请吊销其证书`)
       await load()
     } catch (e) {
       message.error(e instanceof ApiError ? e.message : '断开失败')
@@ -79,7 +79,7 @@ export default function OnlineClients({ canKick = true }: { canKick?: boolean })
         canKick ? (
           <Popconfirm
             title={`断开 ${c.cn} 的连接?`}
-            description="仅断开当前会话,客户端可能自动重连;永久禁用请使用吊销。"
+            description="仅断开当前会话,客户端可能自动重连;如需永久禁用,请吊销其证书。"
             onConfirm={() => kick(c.cn)}
           >
             <Button size="small" danger icon={<DisconnectOutlined />}>
@@ -97,7 +97,7 @@ export default function OnlineClients({ canKick = true }: { canKick?: boolean })
         <Space>
           在线客户端
           <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
-            状态约每 60 秒刷新,列表每 10 秒自动拉取
+            列表每 10 秒自动刷新;流量数据由服务端约每 60 秒更新
           </Typography.Text>
         </Space>
       }
