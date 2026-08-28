@@ -23,12 +23,13 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
-import { CheckCircleTwoTone, CloseCircleTwoTone, DownloadOutlined, PlusOutlined, StopOutlined } from '@ant-design/icons'
+import { CheckCircleTwoTone, CloseCircleTwoTone, DownloadOutlined, PlusOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
-import type { ClientCert, InstallState, NodePerms, NodeRow, PrecheckReport, StepStatus } from '../types'
+import type { ClientCert, DnsState, InstallState, NodePerms, NodeRow, Occupant, PrecheckReport, StepStatus } from '../types'
 
 export const hostOf = (url: string): string => {
   try {
@@ -49,6 +50,7 @@ const installDefaults = {
   enableIPv6: false,
   subnet6: 'fd42:42:42:42::/112',
   dnsMode: 'cloudflare',
+  freePort53: false,
 }
 
 const dnsOptions = [
@@ -63,6 +65,7 @@ function InstallFields() {
   const form = Form.useFormInstance()
   const dnsMode = Form.useWatch('dnsMode', form)
   const enableIPv6 = Form.useWatch('enableIPv6', form)
+  const port = Form.useWatch('port', form)
   return (
     <>
       <Row gutter={12}>
@@ -83,6 +86,16 @@ function InstallFields() {
           </Form.Item>
         </Col>
       </Row>
+      {port === 53 && (
+        <Form.Item
+          name="freePort53"
+          label="自动关闭 DNS Stub 释放 53 端口"
+          valuePropName="checked"
+          tooltip="53 端口被 systemd-resolved 的 DNS Stub(127.0.0.53)占用时,安装器会通过 drop-in 关闭 Stub 并切换 resolv.conf 到真实上游;原状记入回滚日志,失败或回滚时自动恢复。其它进程占用仍会中止安装。"
+        >
+          <Switch />
+        </Form.Item>
+      )}
       <Row gutter={12}>
         <Col span={12}>
           <Form.Item name="subnet" label="VPN 网段" rules={[{ required: true, message: '请输入网段' }]}>
@@ -568,7 +581,141 @@ function CertsPanel({ node }: { node: NodeRow }) {
   )
 }
 
-// 节点详情抽屉:概览 / 安装 / 证书
+function occupant53Tag(o: Occupant) {
+  switch (o.class) {
+    case 'resolved':
+      return <Tag color="blue">systemd-resolved</Tag>
+    case 'openvpn':
+      return (
+        <Tooltip title="该节点 OpenVPN 实例的监听端口为 53,属正常占用">
+          <Tag color="green">OpenVPN(本服务)</Tag>
+        </Tooltip>
+      )
+    case 'known-dns':
+      return <Tag color="gold">已知 DNS 服务</Tag>
+    default:
+      return (
+        <Tooltip title="该进程不由本系统管理,不会被自动停止;请人工确认后再作处理">
+          <Tag color="red">外部进程</Tag>
+        </Tooltip>
+      )
+  }
+}
+
+// 节点 DNS Stub / 53 端口管理:经主节点代理直达子节点(操作需「升级维护」授权)
+function DNSPanel({ node }: { node: NodeRow }) {
+  const { message } = AntApp.useApp()
+  const [dns, setDns] = useState<DnsState | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [acting, setActing] = useState(false)
+  const canOp = canNode(node, 'upgrade')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      setDns(await api<DnsState>(`/api/nodes/${node.id}/proxy/dns/stub`))
+    } catch (e) {
+      message.error(e instanceof ApiError ? e.message : '获取节点 DNS 状态失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [node.id, message])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const act = async (path: string, okMsg: string) => {
+    setActing(true)
+    try {
+      await api(`/api/nodes/${node.id}/proxy/${path}`, { method: 'POST' })
+      message.success(okMsg)
+      await load()
+    } catch (e) {
+      message.error(e instanceof ApiError ? e.message : '操作失败')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  if (!node.health.reachable) return <Alert type="error" showIcon message="节点不可达,无法获取 DNS 状态" />
+  if (!dns) return <Card loading size="small" />
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Alert
+        type="info"
+        showIcon
+        message="systemd-resolved 的 DNS Stub 默认监听 127.0.0.53:53。要让该节点的 OpenVPN 使用 53 端口,可在此手动关闭 Stub,或在「安装」页开启「自动关闭 DNS Stub」由安装器处理(两种方式均可恢复)。"
+      />
+      <Space wrap>
+        {dns.resolvedExists ? (
+          <Tag color={dns.resolvedActive ? 'blue' : 'default'}>
+            systemd-resolved {dns.resolvedActive ? '运行中' : '未运行'}
+          </Tag>
+        ) : (
+          <Tag>无 systemd-resolved</Tag>
+        )}
+        {dns.dropInPresent && <Tag color="purple">Stub 已由 drop-in 关闭</Tag>}
+        {dns.resolvConfIsLink && (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            /etc/resolv.conf → {dns.resolvConfTarget}
+          </Typography.Text>
+        )}
+      </Space>
+      {dns.port53.free ? (
+        <Badge status="success" text="UDP 53 空闲" />
+      ) : (
+        <List
+          size="small"
+          dataSource={dns.port53.occupants ?? []}
+          renderItem={(o) => (
+            <List.Item>
+              <Space wrap>
+                {occupant53Tag(o)}
+                <Typography.Text code>
+                  {o.comm || '?'} (PID {o.pid || '?'})
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  {o.addr}:{o.port} {o.unit && `· ${o.unit}`}
+                </Typography.Text>
+              </Space>
+            </List.Item>
+          )}
+        />
+      )}
+      <Space wrap>
+        {canOp && dns.resolvedExists && !dns.dropInPresent && (
+          <Popconfirm
+            title="关闭该节点 systemd-resolved 的 DNS Stub?"
+            description="通过 drop-in 配置关闭(不改写主配置),原状会保存为恢复点,可随时恢复。"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => act('dns/stub/disable', 'DNS Stub 已关闭(drop-in 方式)')}
+          >
+            <Button danger loading={acting}>
+              关闭 DNS Stub
+            </Button>
+          </Popconfirm>
+        )}
+        {canOp && dns.backupPresent && (
+          <Button loading={acting} onClick={() => act('dns/stub/restore', '已恢复该节点 DNS 原状')}>
+            恢复原状
+          </Button>
+        )}
+        <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
+          刷新
+        </Button>
+      </Space>
+      {!canOp && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          您对该节点没有「升级维护」权限,仅可查看 DNS 状态。
+        </Typography.Text>
+      )}
+    </Space>
+  )
+}
+
+// 节点详情抽屉:概览 / 安装 / DNS / 证书
 export default function NodeDrawer({
   node,
   onClose,
@@ -651,6 +798,7 @@ export default function NodeDrawer({
             ),
           },
           { key: 'install', label: '安装', children: <InstallPanel node={node} refreshList={refreshList} /> },
+          { key: 'dns', label: 'DNS Stub / 53 端口', children: <DNSPanel node={node} /> },
           { key: 'certs', label: '客户端证书', children: <CertsPanel node={node} /> },
         ]}
       />

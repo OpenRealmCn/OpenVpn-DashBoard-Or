@@ -13,3 +13,6 @@ web/dist/*
 # 系统与编辑器
 .DS_Store
 Thumbs.db
+
+# cc-connect 本地会话数据(含聊天附件,严禁提交)
+.cc-connect/

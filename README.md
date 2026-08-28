@@ -44,6 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/ma
 
 - 关闭 systemd-resolved 的 DNS Stub 一律走 **drop-in**(`/etc/systemd/resolved.conf.d/`),绝不改写主配置,可一键恢复
 - UDP 53 占用自动归类:resolved / 已知 DNS 服务 / 未知进程;**未知进程绝不自动停止**(后端不存在该 API)
+- VPN 端口选 53 时可勾选「自动关闭 DNS Stub」:安装器确认占用者仅为 resolved 后,在启动服务前经 drop-in 关闭 Stub 释放端口并切换 `resolv.conf` 到真实上游;原状记入回滚 journal,失败或回滚自动复原,其它进程占用仍会中止安装
 
 **证书与分享**
 
@@ -63,6 +64,7 @@ curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/ma
 - 远程安装:主面板向单个或多个子节点下发 OpenVPN 部署(连接地址自动取各节点主机名),进度实时可见
 - 批量下发:勾选多节点一键执行重启服务、检查更新、升级 OpenVPN/EasyRSA/面板等,结果逐节点可读展示
 - 节点授权:子用户按节点授予「完整管理」模板或九项细分权限(查看/创建证书/吊销/安装/回滚/服务控制/断开客户端/升级维护/重启面板),附只读、证书管理员、运维等预设模板;主面板逐操作校验,修改即时生效
+- 节点 DNS 管理:节点详情新增「DNS Stub / 53 端口」页,远程查看子节点 resolved 状态与 53 端口占用归类,一键关闭 / 恢复 DNS Stub(操作需「升级维护」授权)
 
 **运维**
 
@@ -152,7 +154,8 @@ install.sh          在线管理脚本(安装/更新/卸载/状态)
 - [ ] 带密码证书导入时要求输入密码;吊销后原客户端无法建立新连接
 - [ ] 人为制造失败(占用端口/断网)→ 自动回滚后 `/etc/openvpn`、`/etc/sysctl.d`、iptables、resolved drop-in 与 `/etc/resolv.conf` 均复原
 - [ ] dnsmasq 或 `nc -lup 53` 占用 53 时,预检正确归类且不停止对方进程
-- [ ] 仪表盘关闭 DNS Stub(drop-in 生成、53 释放、解析正常),恢复原状成功
+- [ ] 端口选 53 且被 resolved Stub 占用:未勾选自动释放时预检给出提示;勾选后安装成功、本机解析正常,回滚后 Stub 与 `resolv.conf` 复原
+- [ ] 仪表盘关闭 DNS Stub(drop-in 生成、53 释放、解析正常),恢复原状成功;节点详情「DNS Stub / 53 端口」页对子节点可完成同样操作
 - [ ] 子用户:仅授予「查看+创建证书」时,吊销/安装/维护接口 403;配额用满创建被拒;只能下载自己创建的证书
 - [ ] 管理员修改子用户权限即时生效;禁用账号后其会话立即失效
 - [ ] 备份导出 → 篡改/删除文件 → 上传恢复后完整复原,OpenVPN 自动重启

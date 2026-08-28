@@ -50,6 +50,7 @@ func buildSteps() []Step {
 		stepServerConf(),
 		stepSysctl(),
 		stepFirewall(),
+		stepFreePort53(),
 		stepService(),
 		stepDNSSelf(),
 		stepVerify(),

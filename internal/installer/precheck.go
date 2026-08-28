@@ -80,19 +80,38 @@ func RunPrecheck(ctx context.Context, plat platform.Platform, dns *dnsguard.Guar
 		add("bash", true, "可用")
 	}
 
-	// 端口占用
+	// 端口占用;端口 53 仅被 resolved 的 DNS Stub 占用时可由安装器自动释放
 	ports, err := plat.ListenPorts(ctx)
 	if err != nil {
 		add("端口检查", false, "无法枚举监听端口: "+err.Error())
 	} else {
-		conflict := ""
+		portName := fmt.Sprintf("端口 %s/%d", p.Proto, p.Port)
+		var occupants []platform.PortInfo
 		for _, pt := range ports {
 			if pt.Proto == p.Proto && pt.Port == p.Port {
-				conflict = fmt.Sprintf("%s:%d 已被 %s(PID %d)占用", pt.Addr, pt.Port, pt.Comm, pt.PID)
+				occupants = append(occupants, pt)
+			}
+		}
+		onlyResolved := len(occupants) > 0
+		for _, pt := range occupants {
+			if dnsguard.Classify(pt) != dnsguard.ClassResolved {
+				onlyResolved = false
 				break
 			}
 		}
-		add(fmt.Sprintf("端口 %s/%d", p.Proto, p.Port), conflict == "", map[bool]string{true: "空闲", false: conflict}[conflict == ""])
+		switch {
+		case len(occupants) == 0:
+			add(portName, true, "空闲")
+		case p.Port == 53 && onlyResolved && p.FreePort53:
+			add(portName, true, fmt.Sprintf(
+				"%s:53 被 systemd-resolved 的 DNS Stub 占用;安装时将通过 drop-in 关闭 Stub 自动释放(已记入回滚日志,可恢复)", occupants[0].Addr))
+		case p.Port == 53 && onlyResolved:
+			add(portName, false, fmt.Sprintf(
+				"%s:53 被 systemd-resolved 的 DNS Stub 占用;可开启「自动关闭 DNS Stub」选项,由安装器释放该端口(drop-in 方式,可恢复)", occupants[0].Addr))
+		default:
+			pt := occupants[0]
+			add(portName, false, fmt.Sprintf("%s:%d 已被 %s(PID %d)占用", pt.Addr, pt.Port, pt.Comm, pt.PID))
+		}
 	}
 
 	// IPv6 前提检查

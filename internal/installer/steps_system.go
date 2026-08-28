@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"openvpntools/internal/dnsguard"
 	"openvpntools/internal/openvpn"
 	"openvpntools/internal/platform"
 )
@@ -105,6 +106,57 @@ func stepFirewall() Step {
 		}
 		return nil
 	}}
+}
+
+// stepFreePort53 在 OpenVPN 启动前关闭 resolved 的 DNS Stub 释放 53 端口。
+// 只处理 resolved:精检发现其它进程占用时中止(与 dnsguard 的硬性规则一致)。
+func stepFreePort53() Step {
+	return Step{
+		ID: "freeport53", Name: "关闭 DNS Stub 释放 53 端口",
+		Skip: func(c *StepCtx) bool { return !(c.Params.FreePort53 && c.Params.Port == 53) },
+		Run: func(c *StepCtx) error {
+			rep, err := c.DNS.CheckPort53(c.Ctx)
+			if err != nil {
+				return fmt.Errorf("检查 53 端口占用失败: %w", err)
+			}
+			if rep.Free {
+				c.Log("UDP 53 已空闲,无需处理")
+				return nil
+			}
+			for _, oc := range rep.Occupants {
+				if oc.Class != dnsguard.ClassResolved {
+					return fmt.Errorf("53 端口被 %s(PID %d)占用,并非 systemd-resolved,本工具不会代为停止", oc.Comm, oc.PID)
+				}
+			}
+			backup := c.DNS.SnapshotStub()
+			// write-ahead:预判 DisableStub 会否切换 resolv.conf,journal 里的恢复点才完整
+			journaled := backup
+			journaled.SwitchedResolvConf = backup.ResolvConfIsLink && strings.Contains(backup.OldTarget, "stub-resolv.conf")
+			if err := c.Journal.Record(c.StepID, ActDNSStub, journaled); err != nil {
+				return err
+			}
+			c.Log("写 drop-in:DNSStubListener=no 并重启 systemd-resolved(原状已记入回滚日志)")
+			if err := c.DNS.DisableStub(c.Ctx, &backup); err != nil {
+				return err
+			}
+			deadline := time.Now().Add(10 * time.Second)
+			for {
+				rep, err := c.DNS.CheckPort53(c.Ctx)
+				if err == nil && rep.Free {
+					c.Log("UDP 53 已释放")
+					return nil
+				}
+				if time.Now().After(deadline) {
+					return errors.New("关闭 DNS Stub 后 53 端口仍未释放,已中止")
+				}
+				select {
+				case <-c.Ctx.Done():
+					return c.Ctx.Err()
+				case <-time.After(500 * time.Millisecond):
+				}
+			}
+		},
+	}
 }
 
 func stepService() Step {

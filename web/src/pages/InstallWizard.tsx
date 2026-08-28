@@ -32,6 +32,7 @@ const defaultParams: InstallParams = {
   subnet6: 'fd42:42:42:42::/112',
   dnsMode: 'cloudflare',
   publicAddr: '',
+  freePort53: false,
 }
 
 const stepStatusMap: Record<StepStatus, 'wait' | 'process' | 'finish' | 'error'> = {
@@ -62,6 +63,7 @@ export default function InstallWizard() {
   const esRef = useRef<EventSource | null>(null)
   const dnsMode = Form.useWatch('dnsMode', form)
   const enableIPv6 = Form.useWatch('enableIPv6', form)
+  const port = Form.useWatch('port', form)
 
   const loadState = useCallback(async () => {
     const st = await api<InstallState>('/api/install/state')
@@ -235,6 +237,16 @@ export default function InstallWizard() {
                     </Form.Item>
                   </Col>
                 </Row>
+                {port === 53 && (
+                  <Form.Item
+                    name="freePort53"
+                    label="自动关闭 DNS Stub 释放 53 端口"
+                    valuePropName="checked"
+                    tooltip="53 端口被 systemd-resolved 的 DNS Stub(127.0.0.53)占用时,安装器会通过 drop-in 关闭 Stub 并切换 resolv.conf 到真实上游;原状记入回滚日志,失败或回滚时自动恢复。其它进程占用仍会中止安装。"
+                  >
+                    <Switch />
+                  </Form.Item>
+                )}
                 <Form.Item
                   name="subnet"
                   label="VPN 网段"

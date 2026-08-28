@@ -124,6 +124,7 @@ export interface InstallParams {
   dns1?: string
   dns2?: string
   publicAddr: string
+  freePort53?: boolean
 }
 
 export interface CheckResult {

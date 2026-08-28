@@ -30,6 +30,10 @@ type Params struct {
 	DNS1       string  `json:"dns1"`
 	DNS2       string  `json:"dns2"`
 	PublicAddr string  `json:"publicAddr"` // 客户端 remote 用的公网 IP 或域名
+	// FreePort53:VPN 端口选 udp/53 且被 systemd-resolved 的 DNS Stub 占用时,
+	// 安装期间自动关闭 Stub 释放端口(drop-in 方式,记入回滚日志可完整恢复)。
+	// 仅对 resolved 生效,其它进程占用仍会中止安装。
+	FreePort53 bool `json:"freePort53"`
 }
 
 var addrRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]*$`)
@@ -94,6 +98,12 @@ func (p *Params) Normalize() error {
 		}
 	default:
 		return fmt.Errorf("未知 DNS 模式: %s", p.DNSMode)
+	}
+	if p.DNSMode == DNSSelf && p.Port == 53 {
+		return fmt.Errorf("「本机 systemd-resolved」DNS 模式需由 resolved 监听 53 端口,与 VPN 端口 53 冲突,请更换端口或 DNS 模式")
+	}
+	if p.Port != 53 {
+		p.FreePort53 = false // 仅对 53 端口有意义
 	}
 	p.PublicAddr = strings.TrimSpace(p.PublicAddr)
 	if p.PublicAddr == "" {
