@@ -339,7 +339,8 @@ export default function Nodes() {
                       <Typography.Paragraph
                         code
                         copyable={{ text: joinInfo.command }}
-                        style={{ wordBreak: 'break-all', background: '#141414', color: '#95de64', padding: 12, borderRadius: 6 }}
+                        className="term-box"
+                        style={{ wordBreak: 'break-all', color: '#95de64' }}
                       >
                         {joinInfo.command}
                       </Typography.Paragraph>

@@ -421,19 +421,7 @@ export default function InstallWizard() {
                   </Space>
                 }
               >
-                <div
-                  ref={logBoxRef}
-                  style={{
-                    background: '#141414',
-                    borderRadius: 6,
-                    padding: 12,
-                    height: 420,
-                    overflow: 'auto',
-                    fontFamily: 'Consolas, Menlo, monospace',
-                    fontSize: 12.5,
-                    lineHeight: 1.7,
-                  }}
-                >
+                <div ref={logBoxRef} className="term-box" style={{ height: 420 }}>
                   {logs.map((l) => (
                     <div key={l.seq} style={{ color: logColor(l.level) }}>
                       {l.step ? `[${l.step}] ` : ''}

@@ -14,10 +14,17 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
-import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import {
+  CloudServerOutlined,
+  DesktopOutlined,
+  ExperimentOutlined,
+  ReloadOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
 import { hasPerm, useSession } from '../session'
+import StatCard from '../components/StatCard'
 import type { Occupant, PortInfo, StatusResp } from '../types'
 
 const portColumns: ColumnsType<PortInfo> = [
@@ -88,45 +95,41 @@ export default function Dashboard() {
   const svc = status?.openvpn.service
   const dns = status?.dns
   const ipfwd = status?.ipForward
+  const svcTone = !svc || !svc.exists ? '#94a3b8' : svc.active ? '#22c55e' : '#ef4444'
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Row gutter={[16, 16]}>
+    <Space direction="vertical" size={16} style={{ width: '100%' }} className="stagger">
+      <Row gutter={[16, 16]} className="stagger">
         <Col xs={24} sm={12} lg={6}>
-          <Card size="small" title="OpenVPN 服务">
-            {!svc || !svc.exists ? (
-              <Badge status="default" text="未安装" />
-            ) : svc.active ? (
-              <Badge status="success" text="运行中" />
-            ) : (
-              <Badge status="error" text="已停止" />
-            )}
-            <div style={{ marginTop: 8 }}>
-              {svc?.enabled ? <Tag color="green">开机自启</Tag> : <Tag>未设自启</Tag>}
-            </div>
-          </Card>
+          <StatCard title="OpenVPN 服务" icon={<CloudServerOutlined />} tone={svcTone}>
+            <Space direction="vertical" size={4}>
+              {!svc || !svc.exists ? (
+                <Badge status="default" text="未安装" />
+              ) : svc.active ? (
+                <Badge status="processing" color="#22c55e" text="运行中" />
+              ) : (
+                <Badge status="error" text="已停止" />
+              )}
+              <span>{svc?.enabled ? <Tag color="green">开机自启</Tag> : <Tag>未设自启</Tag>}</span>
+            </Space>
+          </StatCard>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card size="small" title="IPv4 转发">
-            <Space direction="vertical" size={8}>
-              <Space>
+          <StatCard title="IPv4 转发" icon={<ThunderboltOutlined />} tone={ipfwd?.runtime ? '#22c55e' : '#f59e0b'}>
+            <Space direction="vertical" size={6}>
+              <Space wrap size={6}>
                 {ipfwd?.runtime ? (
                   <Badge status="success" text="已开启" />
                 ) : (
                   <Badge status="warning" text="未开启" />
                 )}
-                {ipfwd?.persisted ? (
-                  <Tag color="green">已持久化</Tag>
-                ) : (
-                  <Tag color="orange">未持久化</Tag>
-                )}
+                {ipfwd?.persisted ? <Tag color="green">已持久化</Tag> : <Tag color="orange">未持久化</Tag>}
               </Space>
               {canMaintain && (!ipfwd?.runtime || !ipfwd?.persisted) && (
                 <Button
                   size="small"
                   type="primary"
                   ghost
-                  icon={<ThunderboltOutlined />}
                   loading={acting}
                   onClick={() => act('/api/system/ipforward', 'IPv4 转发已开启并持久化到 sysctl.d')}
                 >
@@ -134,21 +137,25 @@ export default function Dashboard() {
                 </Button>
               )}
             </Space>
-          </Card>
+          </StatCard>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card size="small" title="操作系统">
-            <Typography.Text>{status?.os.pretty || '-'}</Typography.Text>
-          </Card>
+          <StatCard title="操作系统" icon={<DesktopOutlined />} tone="#0ea5e9">
+            <Typography.Text strong>{status?.os.pretty || '-'}</Typography.Text>
+          </StatCard>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card size="small" title="运行模式">
+          <StatCard
+            title="运行模式"
+            icon={<ExperimentOutlined />}
+            tone={status?.mode === 'linux' ? '#6366f1' : '#f59e0b'}
+          >
             {status?.mode === 'linux' ? (
               <Tag color="blue">Linux 生产模式</Tag>
             ) : (
               <Tag color="orange">mock 演示模式</Tag>
             )}
-          </Card>
+          </StatCard>
         </Col>
       </Row>
 
@@ -169,11 +176,7 @@ export default function Dashboard() {
               </Popconfirm>
             )}
             {canMaintain && dns?.backupPresent && (
-              <Button
-                size="small"
-                loading={acting}
-                onClick={() => act('/api/dns/stub/restore', '已恢复 DNS 原状')}
-              >
+              <Button size="small" loading={acting} onClick={() => act('/api/dns/stub/restore', '已恢复 DNS 原状')}>
                 恢复原状
               </Button>
             )}

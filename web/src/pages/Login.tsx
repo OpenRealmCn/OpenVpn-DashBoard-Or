@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { App as AntApp, Button, Card, Form, Input, Typography } from 'antd'
-import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { LockOutlined, SafetyCertificateOutlined, UserOutlined } from '@ant-design/icons'
 import { api, ApiError } from '../api/client'
 import { useSession } from '../session'
 
@@ -40,29 +40,22 @@ export default function Login() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)',
-      }}
-    >
-      <Card style={{ width: 380, boxShadow: '0 8px 24px rgba(0,0,0,.25)' }}>
-        <Typography.Title level={3} style={{ textAlign: 'center', marginTop: 0 }}>
-          OpenVpnTools
-        </Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
-          {setupMode ? '首次使用,请设置管理员密码' : 'OpenVPN 服务器管理面板'}
-        </Typography.Paragraph>
-        <Form<FormValues> onFinish={onFinish} layout="vertical" initialValues={{ username: 'admin' }}>
+    <div className="login-bg">
+      <Card className="login-card" styles={{ body: { padding: 32 } }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div className="brand-mark" style={{ width: 52, height: 52, fontSize: 26, margin: '0 auto 14px' }}>
+            <SafetyCertificateOutlined />
+          </div>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            OpenVpnTools
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            {setupMode ? '首次使用,请设置管理员密码' : 'OpenVPN 服务器管理面板'}
+          </Typography.Text>
+        </div>
+        <Form<FormValues> onFinish={onFinish} layout="vertical" initialValues={{ username: 'admin' }} size="large">
           {!setupMode && (
-            <Form.Item
-              name="username"
-              label="用户名"
-              rules={[{ required: true, message: '请输入用户名' }]}
-            >
+            <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
               <Input prefix={<UserOutlined />} placeholder="admin 或子用户名" />
             </Form.Item>
           )}
@@ -94,7 +87,7 @@ export default function Login() {
               <Input.Password prefix={<LockOutlined />} placeholder="再次输入密码" />
             </Form.Item>
           )}
-          <Button type="primary" htmlType="submit" block loading={loading}>
+          <Button type="primary" htmlType="submit" block loading={loading} style={{ marginTop: 4 }}>
             {setupMode ? '设置并登录' : '登录'}
           </Button>
         </Form>

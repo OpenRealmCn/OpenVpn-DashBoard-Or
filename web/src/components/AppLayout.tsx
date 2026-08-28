@@ -1,20 +1,36 @@
 import { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { App as AntApp, Button, Dropdown, Form, Input, Layout, Menu, Modal, Space, Tag } from 'antd'
+import {
+  App as AntApp,
+  Button,
+  Dropdown,
+  Form,
+  Input,
+  Layout,
+  Menu,
+  Modal,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
 import {
   ClusterOutlined,
   DashboardOutlined,
   KeyOutlined,
   LogoutOutlined,
+  MoonOutlined,
   RocketOutlined,
-  SettingOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
+  SunOutlined,
   TeamOutlined,
   ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { api, ApiError } from '../api/client'
 import { hasPerm, useSession } from '../session'
+import { useTheme } from '../theme'
 import type { Perms } from '../types'
 
 interface MenuDef {
@@ -100,6 +116,7 @@ export default function AppLayout() {
   const loc = useLocation()
   const { session, refresh } = useSession()
   const { message } = AntApp.useApp()
+  const { dark, toggle } = useTheme()
   const [pwOpen, setPwOpen] = useState(false)
 
   const menus = useMemo(
@@ -117,6 +134,8 @@ export default function AppLayout() {
     return hit ? hit.key : '/'
   }, [loc.pathname, menus])
 
+  const pageTitle = menus.find((m) => m.key === selectedKey)?.label ?? ''
+
   const logout = async () => {
     try {
       await api('/api/logout', { method: 'POST' })
@@ -128,9 +147,12 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Layout.Sider breakpoint="lg" collapsedWidth={64} theme="dark">
-        <div style={{ padding: '18px 16px', color: '#fff', fontWeight: 600, fontSize: 16 }}>
-          OpenVpnTools
+      <Layout.Sider breakpoint="lg" collapsedWidth={64} className="app-sider">
+        <div className="brand">
+          <div className="brand-mark">
+            <SafetyCertificateOutlined />
+          </div>
+          <span className="brand-name">OpenVpnTools</span>
         </div>
         <Menu
           theme="dark"
@@ -142,34 +164,44 @@ export default function AppLayout() {
       </Layout.Sider>
       <Layout>
         <Layout.Header
-          style={{
-            background: '#fff',
-            padding: '0 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
+          className="app-header"
+          style={{ padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
         >
-          <Space>
-            <span style={{ fontWeight: 600 }}>OpenVPN 服务器管理</span>
+          <Space size={12}>
+            <Typography.Text strong style={{ fontSize: 15 }}>
+              {pageTitle}
+            </Typography.Text>
             {session.mode === 'mock' && <Tag color="orange">mock 演示模式</Tag>}
           </Space>
-          <Dropdown
-            menu={{
-              items: [
-                { key: 'pw', icon: <KeyOutlined />, label: '修改密码', onClick: () => setPwOpen(true) },
-                { key: 'out', icon: <LogoutOutlined />, label: '退出登录', onClick: logout },
-              ],
-            }}
-          >
-            <Button icon={<UserOutlined />}>
-              {session.user?.username ?? '-'}
-              {session.user?.isAdmin ? '(管理员)' : ''}
-            </Button>
-          </Dropdown>
+          <Space size={4}>
+            <Tooltip title={dark ? '切换为亮色模式' : '切换为暗色模式'}>
+              <Button
+                type="text"
+                shape="circle"
+                aria-label="切换主题"
+                icon={dark ? <SunOutlined /> : <MoonOutlined />}
+                onClick={toggle}
+              />
+            </Tooltip>
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'pw', icon: <KeyOutlined />, label: '修改密码', onClick: () => setPwOpen(true) },
+                  { key: 'out', icon: <LogoutOutlined />, label: '退出登录', onClick: logout },
+                ],
+              }}
+            >
+              <Button type="text" icon={<UserOutlined />}>
+                {session.user?.username ?? '-'}
+                {session.user?.isAdmin ? '(管理员)' : ''}
+              </Button>
+            </Dropdown>
+          </Space>
         </Layout.Header>
-        <Layout.Content style={{ padding: 24, maxWidth: 1200, width: '100%', margin: '0 auto' }}>
-          <Outlet />
+        <Layout.Content style={{ padding: 24, maxWidth: 1240, width: '100%', margin: '0 auto' }}>
+          <div key={loc.pathname} className="page-enter">
+            <Outlet />
+          </div>
         </Layout.Content>
       </Layout>
       <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
