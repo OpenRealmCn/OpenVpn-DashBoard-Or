@@ -143,6 +143,24 @@ body {
   overflow: auto;
 }
 
+/* ---------- 移动端自适应 ---------- */
+.app-content {
+  padding: 24px;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+}
+.ant-layout-header.app-header { padding: 0 24px; }
+.app-nav-drawer .ant-menu { background: transparent; border-inline-end: none !important; }
+
+@media (max-width: 767px) {
+  .app-content { padding: 12px; }
+  .ant-layout-header.app-header { padding: 0 10px; }
+  .ant-card > .ant-card-head { padding: 0 14px; }
+  .ant-card > .ant-card-body { padding: 16px 14px; }
+  .term-box { padding: 10px; font-size: 11.5px; }
+}
+
 /* ---------- 滚动条 ---------- */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { border-radius: 8px; background: rgba(100, 116, 139, 0.35); }

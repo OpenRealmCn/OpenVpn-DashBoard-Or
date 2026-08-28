@@ -244,6 +244,7 @@ export default function Clients() {
           dataSource={list}
           loading={loading}
           size="middle"
+          scroll={{ x: 'max-content' }}
           pagination={{ pageSize: 10, hideOnSinglePage: true }}
         />
       </Card>

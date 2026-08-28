@@ -118,6 +118,7 @@ export default function OnlineClients({ canKick = true }: { canKick?: boolean })
         dataSource={list}
         size="small"
         pagination={false}
+        scroll={{ x: 'max-content' }}
         locale={{ emptyText: '当前没有客户端在线' }}
       />
     </Card>

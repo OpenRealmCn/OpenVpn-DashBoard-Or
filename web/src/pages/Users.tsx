@@ -290,6 +290,7 @@ export default function Users() {
         loading={loading}
         size="middle"
         pagination={false}
+        scroll={{ x: 'max-content' }}
         locale={{ emptyText: '还没有子用户' }}
       />
 

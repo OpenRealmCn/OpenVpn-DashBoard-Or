@@ -381,6 +381,7 @@ export default function Maintenance() {
             dataSource={auditList}
             loading={auditLoading}
             size="small"
+            scroll={{ x: 'max-content' }}
             pagination={{ pageSize: 15, hideOnSinglePage: true }}
             locale={{ emptyText: '暂无审计记录' }}
           />

@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   App as AntApp,
   Button,
+  Drawer,
   Dropdown,
   Form,
   Input,
@@ -20,6 +21,7 @@ import {
   DashboardOutlined,
   KeyOutlined,
   LogoutOutlined,
+  MenuOutlined,
   MoonOutlined,
   RocketOutlined,
   SafetyCertificateOutlined,
@@ -55,6 +57,18 @@ const allMenus: MenuDef[] = [
 
 // 管理目标选择器只在与目标相关的页面展示
 const targetAwarePages = ['/', '/clients']
+
+// useIsMobile 以 matchMedia 同步初始化,避免桌面端首帧闪烁
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return isMobile
+}
 
 function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { message } = AntApp.useApp()
@@ -124,6 +138,8 @@ function LayoutInner() {
   const { dark, toggle } = useTheme()
   const { target, setTarget, options } = useTarget()
   const [pwOpen, setPwOpen] = useState(false)
+  const isMobile = useIsMobile()
+  const [navOpen, setNavOpen] = useState(false)
 
   const menus = useMemo(() => {
     const u = session.user
@@ -156,38 +172,59 @@ function LayoutInner() {
     }
   }
 
+  const brand = (
+    <div className="brand">
+      <div className="brand-mark">
+        <SafetyCertificateOutlined />
+      </div>
+      <span className="brand-name">OpenVpnTools</span>
+    </div>
+  )
+  const menuEl = (
+    <Menu
+      theme="light"
+      mode="inline"
+      selectedKeys={[selectedKey]}
+      items={menus.map(({ key, icon, label }) => ({ key, icon, label }))}
+      onClick={(e) => {
+        nav(e.key)
+        setNavOpen(false)
+      }}
+    />
+  )
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Layout.Sider breakpoint="lg" collapsedWidth={64} className="app-sider">
-        <div className="brand">
-          <div className="brand-mark">
-            <SafetyCertificateOutlined />
-          </div>
-          <span className="brand-name">OpenVpnTools</span>
-        </div>
-        <Menu
-          theme="light"
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={menus.map(({ key, icon, label }) => ({ key, icon, label }))}
-          onClick={(e) => nav(e.key)}
-        />
-      </Layout.Sider>
+      {!isMobile && (
+        <Layout.Sider breakpoint="lg" collapsedWidth={64} className="app-sider">
+          {brand}
+          {menuEl}
+        </Layout.Sider>
+      )}
       <Layout>
         <Layout.Header
           className="app-header"
-          style={{ padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
         >
-          <Space size={12}>
-            <Typography.Text strong style={{ fontSize: 15 }}>
+          <Space size={isMobile ? 4 : 12}>
+            {isMobile && (
+              <Button type="text" aria-label="打开菜单" icon={<MenuOutlined />} onClick={() => setNavOpen(true)} />
+            )}
+            <Typography.Text strong style={{ fontSize: 15, whiteSpace: 'nowrap' }}>
               {pageTitle}
             </Typography.Text>
             {showTarget && (
               <Tooltip title="选择本页作用的管理目标">
-                <Select size="small" style={{ minWidth: 170 }} value={target} onChange={setTarget} options={options} />
+                <Select
+                  size="small"
+                  style={{ minWidth: isMobile ? 130 : 170 }}
+                  value={target}
+                  onChange={setTarget}
+                  options={options}
+                />
               </Tooltip>
             )}
-            {session.mode === 'mock' && <Tag color="orange">mock 演示模式</Tag>}
+            {session.mode === 'mock' && !isMobile && <Tag color="orange">mock 演示模式</Tag>}
           </Space>
           <Space size={4}>
             <Tooltip title={dark ? '切换为亮色模式' : '切换为暗色模式'}>
@@ -208,18 +245,36 @@ function LayoutInner() {
               }}
             >
               <Button type="text" icon={<UserOutlined />}>
-                {session.user?.username ?? '-'}
-                {session.user?.isAdmin ? '(管理员)' : ''}
+                {!isMobile && (
+                  <>
+                    {session.user?.username ?? '-'}
+                    {session.user?.isAdmin ? '(管理员)' : ''}
+                  </>
+                )}
               </Button>
             </Dropdown>
           </Space>
         </Layout.Header>
-        <Layout.Content style={{ padding: 24, maxWidth: 1240, width: '100%', margin: '0 auto' }}>
+        <Layout.Content className="app-content">
           <div key={loc.pathname + target} className="page-enter">
             <Outlet />
           </div>
         </Layout.Content>
       </Layout>
+      {isMobile && (
+        <Drawer
+          placement="left"
+          width={248}
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          closable={false}
+          className="app-nav-drawer"
+          styles={{ body: { padding: 0, background: 'var(--sider-bg)' } }}
+        >
+          {brand}
+          {menuEl}
+        </Drawer>
+      )}
       <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
     </Layout>
   )

@@ -69,12 +69,12 @@ function InstallFields() {
   return (
     <>
       <Row gutter={12}>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item name="port" label="监听端口" rules={[{ required: true, message: '请输入端口' }]}>
             <InputNumber min={1} max={65535} style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item name="proto" label="协议">
             <Radio.Group
               optionType="button"
@@ -97,25 +97,25 @@ function InstallFields() {
         </Form.Item>
       )}
       <Row gutter={12}>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item name="subnet" label="VPN 网段" rules={[{ required: true, message: '请输入网段' }]}>
             <Input placeholder="10.8.0.0/24" />
           </Form.Item>
         </Col>
-        <Col span={12}>
+        <Col xs={24} sm={12}>
           <Form.Item name="dnsMode" label="推送给客户端的 DNS">
             <Select options={dnsOptions} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={12}>
-        <Col span={10}>
+        <Col xs={24} sm={10}>
           <Form.Item name="enableIPv6" label="启用 IPv6(NAT66)" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Col>
         {enableIPv6 && (
-          <Col span={14}>
+          <Col xs={24} sm={14}>
             <Form.Item name="subnet6" label="IPv6 网段(ULA)" rules={[{ required: true, message: '请输入 IPv6 网段' }]}>
               <Input placeholder="fd42:42:42:42::/112" />
             </Form.Item>
@@ -124,12 +124,12 @@ function InstallFields() {
       </Row>
       {dnsMode === 'custom' && (
         <Row gutter={12}>
-          <Col span={12}>
+          <Col xs={24} sm={12}>
             <Form.Item name="dns1" label="DNS 1" rules={[{ required: true, message: '请输入 DNS' }]}>
               <Input placeholder="223.5.5.5" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} sm={12}>
             <Form.Item name="dns2" label="DNS 2(可选)">
               <Input placeholder="119.29.29.29" />
             </Form.Item>
@@ -534,6 +534,7 @@ function CertsPanel({ node }: { node: NodeRow }) {
         dataSource={list}
         loading={loading}
         size="small"
+        scroll={{ x: 'max-content' }}
         pagination={{ pageSize: 8, hideOnSinglePage: true }}
         locale={{ emptyText: node.health.installed ? '该节点暂无客户端证书' : '该节点尚未安装 OpenVPN' }}
       />
@@ -746,7 +747,7 @@ export default function NodeDrawer({
   const h = node.health
 
   return (
-    <Drawer title={`节点:${node.name}`} width={760} open onClose={onClose} destroyOnClose>
+    <Drawer title={`节点:${node.name}`} width="min(760px, 100vw)" open onClose={onClose} destroyOnClose>
       <Tabs
         items={[
           {
@@ -755,7 +756,7 @@ export default function NodeDrawer({
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 {!h.reachable && <Alert type="error" showIcon message="节点不可达" description={h.error} />}
-                <Descriptions column={2} size="small" bordered>
+                <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
                   <Descriptions.Item label="节点地址" span={2}>
                     <Typography.Link href={node.url} target="_blank">
                       {node.url}

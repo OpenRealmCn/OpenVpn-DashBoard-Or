@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
+  Alert,
   App as AntApp,
   Badge,
   Button,
   Card,
+  Col,
   Dropdown,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
+  Radio,
+  Row,
   Space,
   Switch,
   Table,
@@ -20,6 +25,7 @@ import {
 } from 'antd'
 import {
   ApiOutlined,
+  CodeOutlined,
   ControlOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -32,7 +38,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
 import { useSession } from '../session'
 import NodeDrawer, { hostOf, RemoteInstallModal } from '../components/NodeDrawer'
-import type { BatchResult, JoinCodeResp, NodeRow } from '../types'
+import type { BatchResult, JoinCodeResp, NodeRow, SSHInstallJob } from '../types'
 
 const batchPresets: { key: string; label: string; method: string; path: string; danger?: boolean }[] = [
   { key: 'check', label: '检查更新', method: 'GET', path: 'version?check=1' },
@@ -73,6 +79,128 @@ function formatBatchBody(r: BatchResult): ReactNode {
   } catch {
     return r.body.slice(0, 200)
   }
+}
+
+// SSH 快捷安装:主节点凭一次性 SSH 凭据登录目标机执行 install.sh join,
+// 凭据不落盘;任务日志轮询展示,成功后节点自动出现在列表。
+function SSHInstallPanel({ refreshList }: { refreshList: () => void }) {
+  const { message } = AntApp.useApp()
+  const [form] = Form.useForm()
+  const authMethod = Form.useWatch('authMethod', form)
+  const [job, setJob] = useState<SSHInstallJob | null>(null)
+  const [starting, setStarting] = useState(false)
+  const logRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!job || job.state !== 'running') return
+    const t = setInterval(async () => {
+      try {
+        const j = await api<SSHInstallJob>(`/api/nodes/sshinstall?job=${job.id}`)
+        setJob(j)
+        if (j.state === 'success') refreshList()
+      } catch {
+        /* 单次轮询失败忽略,下一轮重试 */
+      }
+    }, 2000)
+    return () => clearInterval(t)
+  }, [job?.id, job?.state]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
+  }, [job?.logs.length])
+
+  const start = async () => {
+    const v = await form.validateFields()
+    setStarting(true)
+    try {
+      const res = await api<{ jobId: string }>('/api/nodes/sshinstall', {
+        method: 'POST',
+        body: JSON.stringify(v),
+      })
+      setJob({ id: res.jobId, host: v.host, state: 'running', logs: [], startedAt: '' })
+    } catch (e) {
+      message.error(e instanceof ApiError ? e.message : '启动失败')
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Alert
+        type="warning"
+        showIcon
+        message="凭据仅用于本次安装,不会保存;连接不校验主机指纹,请确认目标地址可信。非 root 用户需具备 sudo 权限。"
+      />
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{ port: 22, user: 'root', authMethod: 'password' }}
+        disabled={job?.state === 'running'}
+      >
+        <Row gutter={12}>
+          <Col xs={24} sm={14}>
+            <Form.Item name="host" label="目标主机" rules={[{ required: true, message: '请输入 IP 或域名' }]}>
+              <Input placeholder="203.0.113.10" />
+            </Form.Item>
+          </Col>
+          <Col xs={12} sm={5}>
+            <Form.Item name="port" label="SSH 端口" rules={[{ required: true, message: '端口' }]}>
+              <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col xs={12} sm={5}>
+            <Form.Item name="user" label="用户" rules={[{ required: true, message: '用户' }]}>
+              <Input placeholder="root" />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Form.Item name="authMethod" label="认证方式">
+          <Radio.Group
+            optionType="button"
+            options={[
+              { label: '密码', value: 'password' },
+              { label: 'SSH 私钥', value: 'key' },
+            ]}
+          />
+        </Form.Item>
+        {authMethod === 'key' ? (
+          <>
+            <Form.Item name="privateKey" label="SSH 私钥" rules={[{ required: true, message: '请粘贴私钥内容' }]}>
+              <Input.TextArea
+                rows={5}
+                placeholder={'-----BEGIN OPENSSH PRIVATE KEY-----\n…'}
+                style={{ fontFamily: 'Geist Mono, Consolas, monospace', fontSize: 12 }}
+              />
+            </Form.Item>
+            <Form.Item name="passphrase" label="私钥密码(未加密则留空)">
+              <Input.Password autoComplete="new-password" />
+            </Form.Item>
+          </>
+        ) : (
+          <Form.Item name="password" label="SSH 密码" rules={[{ required: true, message: '请输入密码' }]}>
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        )}
+      </Form>
+      <Button type="primary" icon={<CodeOutlined />} loading={starting || job?.state === 'running'} onClick={start}>
+        {job?.state === 'running' ? '安装中 …' : '连接并安装'}
+      </Button>
+      {job && (
+        <>
+          {job.state === 'success' && <Alert type="success" showIcon message="安装并绑定完成,节点已出现在列表中" />}
+          {job.state === 'failed' && <Alert type="error" showIcon message="安装失败" description={job.error} />}
+          <div ref={logRef} className="term-box" style={{ height: 220 }}>
+            {job.logs.map((l, i) => (
+              <div key={i} style={{ color: l.includes('失败') || l.includes('E:') ? '#ff7875' : '#d9d9d9' }}>
+                {l}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Space>
+  )
 }
 
 export default function Nodes() {
@@ -199,6 +327,7 @@ export default function Nodes() {
                 rowKey="id"
                 size="small"
                 pagination={false}
+                scroll={{ x: 'max-content' }}
                 dataSource={res.results}
                 columns={[
                   { title: '节点', dataIndex: 'name', width: 140, render: (v: string, r) => v || r.id },
@@ -355,6 +484,7 @@ export default function Nodes() {
         loading={loading}
         size="middle"
         pagination={false}
+        scroll={{ x: 'max-content' }}
         rowSelection={{ selectedRowKeys: selected, onChange: (keys) => setSelected(keys as string[]) }}
         locale={{ emptyText: isAdmin ? '尚未接入子节点,点击右上角「添加子节点」开始' : '暂无分配给您的节点' }}
       />
@@ -404,6 +534,11 @@ export default function Nodes() {
                   )}
                 </Space>
               ),
+            },
+            {
+              key: 'ssh',
+              label: 'SSH 快捷安装',
+              children: <SSHInstallPanel refreshList={() => void load(true)} />,
             },
             {
               key: 'manual',

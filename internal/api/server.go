@@ -38,6 +38,7 @@ type Server struct {
 	audit     *audit.Logger
 	nodes     *nodes.Store
 	joinCodes *nodes.JoinCodes
+	sshJobs   *nodes.SSHJobs
 	mode      string // linux / mock,状态页展示用
 }
 
@@ -54,6 +55,7 @@ func New(cfg *config.Manager, authSvc *auth.Service, us *users.Store,
 		audit:     auditLog,
 		nodes:     nodeStore,
 		joinCodes: nodes.NewJoinCodes(),
+		sshJobs:   nodes.NewSSHJobs(),
 		mode:      mode,
 	}
 }
@@ -146,6 +148,8 @@ func (s *Server) Router(static fs.FS) *gin.Engine {
 		adm.PUT("/nodes/:id", s.handleNodeUpdate)
 		adm.DELETE("/nodes/:id", s.handleNodeDelete)
 		adm.POST("/nodes/joincode", s.handleNodeJoinCode)
+		adm.POST("/nodes/sshinstall", s.handleSSHInstallStart)
+		adm.GET("/nodes/sshinstall", s.handleSSHInstallStatus)
 	}
 
 	// 扫码免登录一次性下载(token 即凭证,全局限流防爆破)

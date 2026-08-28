@@ -223,6 +223,15 @@ export interface JoinCodeResp {
   command: string
 }
 
+export interface SSHInstallJob {
+  id: string
+  host: string
+  state: 'running' | 'success' | 'failed'
+  error?: string
+  logs: string[]
+  startedAt: string
+}
+
 export interface BatchResult {
   id: string
   name: string

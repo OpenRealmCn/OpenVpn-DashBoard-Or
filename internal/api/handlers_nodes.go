@@ -226,17 +226,8 @@ func (s *Server) handleNodeDelete(c *gin.Context) {
 // handleNodeJoinCode 生成一次性绑定码与子节点上的一行命令。
 func (s *Server) handleNodeJoinCode(c *gin.Context) {
 	code, exp := s.joinCodes.Create()
-	base := s.cfg.Snapshot().PanelURL
-	if base == "" {
-		scheme := "http"
-		if c.Request.TLS != nil {
-			scheme = "https"
-		}
-		base = scheme + "://" + c.Request.Host
-	}
-	cmd := fmt.Sprintf(
-		"curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/main/install.sh | sudo bash -s -- join %s %s",
-		base, code)
+	cmd := fmt.Sprintf("curl -fsSL %s | sudo bash -s -- join %s %s",
+		installScriptURL, s.panelBaseURL(c), code)
 	c.JSON(http.StatusOK, gin.H{"code": code, "expiresAt": exp.Format(time.RFC3339), "command": cmd})
 }
 

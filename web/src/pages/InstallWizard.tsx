@@ -216,7 +216,7 @@ export default function InstallWizard() {
             <Card title="安装参数">
               <Form<InstallParams> form={form} layout="vertical" initialValues={defaultParams}>
                 <Row gutter={12}>
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Form.Item
                       name="port"
                       label="监听端口"
@@ -225,7 +225,7 @@ export default function InstallWizard() {
                       <InputNumber min={1} max={65535} style={{ width: '100%' }} />
                     </Form.Item>
                   </Col>
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <Form.Item name="proto" label="协议">
                       <Radio.Group
                         options={[
@@ -255,7 +255,7 @@ export default function InstallWizard() {
                   <Input placeholder="10.8.0.0/24" />
                 </Form.Item>
                 <Row gutter={12}>
-                  <Col span={10}>
+                  <Col xs={24} sm={10}>
                     <Form.Item
                       name="enableIPv6"
                       label="启用 IPv6(NAT66)"
@@ -266,7 +266,7 @@ export default function InstallWizard() {
                     </Form.Item>
                   </Col>
                   {enableIPv6 && (
-                    <Col span={14}>
+                    <Col xs={24} sm={14}>
                       <Form.Item
                         name="subnet6"
                         label="IPv6 网段(ULA)"
@@ -290,7 +290,7 @@ export default function InstallWizard() {
                 </Form.Item>
                 {dnsMode === 'custom' && (
                   <Row gutter={12}>
-                    <Col span={12}>
+                    <Col xs={24} sm={12}>
                       <Form.Item
                         name="dns1"
                         label="DNS 1"
@@ -299,7 +299,7 @@ export default function InstallWizard() {
                         <Input placeholder="223.5.5.5" />
                       </Form.Item>
                     </Col>
-                    <Col span={12}>
+                    <Col xs={24} sm={12}>
                       <Form.Item name="dns2" label="DNS 2(可选)">
                         <Input placeholder="119.29.29.29" />
                       </Form.Item>

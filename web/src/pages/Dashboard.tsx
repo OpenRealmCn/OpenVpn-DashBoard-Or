@@ -245,6 +245,7 @@ export default function Dashboard() {
           loading={loading}
           size="small"
           pagination={false}
+          scroll={{ x: 'max-content' }}
         />
       </Card>
     </Space>
