@@ -23,7 +23,7 @@ import {
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
-import { hasPerm, useSession } from '../session'
+import { useTarget } from '../target'
 import StatCard from '../components/StatCard'
 import type { Occupant, PortInfo, StatusResp } from '../types'
 
@@ -67,19 +67,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [acting, setActing] = useState(false)
   const { message } = AntApp.useApp()
-  const { session } = useSession()
-  const canMaintain = hasPerm(session, 'maintain')
+  const { apiPath, canDo } = useTarget()
+  const canMaintain = canDo('maintain')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setStatus(await api<StatusResp>('/api/status'))
+      setStatus(await api<StatusResp>(apiPath('status')))
     } catch (e) {
       message.error(e instanceof ApiError ? e.message : '获取状态失败')
     } finally {
       setLoading(false)
     }
-  }, [message])
+  }, [message, apiPath])
 
   useEffect(() => {
     void load()
@@ -88,7 +88,7 @@ export default function Dashboard() {
   const act = async (path: string, okMsg: string) => {
     setActing(true)
     try {
-      await api(path, { method: 'POST' })
+      await api(apiPath(path), { method: 'POST' })
       message.success(okMsg)
       await load()
     } catch (e) {
@@ -137,7 +137,7 @@ export default function Dashboard() {
                   type="primary"
                   ghost
                   loading={acting}
-                  onClick={() => act('/api/system/ipforward', 'IPv4 转发已开启并持久化到 sysctl.d')}
+                  onClick={() => act('system/ipforward', 'IPv4 转发已开启并持久化到 sysctl.d')}
                 >
                   一键开启并持久化
                 </Button>
@@ -174,7 +174,7 @@ export default function Dashboard() {
               <Popconfirm
                 title="关闭 systemd-resolved 的 DNS Stub?"
                 description="通过 drop-in 配置关闭(不改写主配置),原状会保存为恢复点,可随时恢复。"
-                onConfirm={() => act('/api/dns/stub/disable', 'DNS Stub 已关闭(drop-in 方式)')}
+                onConfirm={() => act('dns/stub/disable', 'DNS Stub 已关闭(drop-in 方式)')}
               >
                 <Button size="small" danger loading={acting}>
                   关闭 DNS Stub
@@ -182,7 +182,7 @@ export default function Dashboard() {
               </Popconfirm>
             )}
             {canMaintain && dns?.backupPresent && (
-              <Button size="small" loading={acting} onClick={() => act('/api/dns/stub/restore', '已恢复 DNS 原状')}>
+              <Button size="small" loading={acting} onClick={() => act('dns/stub/restore', '已恢复 DNS 原状')}>
                 恢复原状
               </Button>
             )}

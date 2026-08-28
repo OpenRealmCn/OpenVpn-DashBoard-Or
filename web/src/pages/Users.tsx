@@ -280,7 +280,8 @@ export default function Users() {
       }
     >
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-        子账户仅可在授权范围内使用面板;证书的下载、分享与吊销仅限其本人创建的证书。权限、配额与节点分配的修改即时生效。
+        子账户仅可在授权范围内使用面板;宿主机证书的下载、分享与吊销仅限其本人创建的证书。
+        宿主机权限与节点授权相互独立,可仅授予节点授权以创建纯子节点管理员;全部修改即时生效。
       </Typography.Paragraph>
       <Table<UserRow>
         rowKey="username"
@@ -321,7 +322,11 @@ export default function Users() {
           >
             <Input.Password placeholder={isCreate ? '至少 8 位' : '留空则不修改'} />
           </Form.Item>
-          <Form.Item name="permKeys" label="权限">
+          <Form.Item
+            name="permKeys"
+            label="宿主机权限(作用于本机,可全部不选)"
+            tooltip="全部不选并仅配置下方节点授权时,该用户即为纯子节点管理员:登录后管理目标自动指向其授权节点"
+          >
             <Checkbox.Group options={permOptions.map((p) => ({ label: p.label, value: p.key }))} />
           </Form.Item>
           <Form.Item name="certLimit" label="有效证书数量上限(0 = 不限)" rules={[{ required: true }]}>

@@ -27,7 +27,8 @@ import { QRCodeSVG } from 'qrcode.react'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
 import OnlineClients from '../components/OnlineClients'
-import { hasPerm, useSession } from '../session'
+import { useSession } from '../session'
+import { useTarget } from '../target'
 import type { ClientCert, ShareResp } from '../types'
 
 const statusTag = (c: ClientCert) => {
@@ -51,11 +52,13 @@ interface CreateForm {
 export default function Clients() {
   const { message } = AntApp.useApp()
   const { session, refresh } = useSession()
+  const { apiPath, canDo, isLocal } = useTarget()
   const me = session.user
-  const canCreate = hasPerm(session, 'certCreate')
-  const canRevoke = hasPerm(session, 'certRevoke')
-  const canKick = hasPerm(session, 'kick')
-  const ownCert = (c: ClientCert) => !!me && (me.isAdmin || c.owner === me.username)
+  const canCreate = canDo('certCreate')
+  const canRevoke = canDo('certRevoke')
+  const canKick = canDo('kick')
+  // 证书归属限制仅适用于宿主机;子节点证书经节点授权控制
+  const ownCert = (c: ClientCert) => !isLocal || (!!me && (me.isAdmin || c.owner === me.username))
   const [list, setList] = useState<ClientCert[]>([])
   const [loading, setLoading] = useState(false)
   const [notInstalled, setNotInstalled] = useState(false)
@@ -68,7 +71,7 @@ export default function Clients() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await api<{ clients: ClientCert[] | null }>('/api/clients')
+      const res = await api<{ clients: ClientCert[] | null }>(apiPath('clients'))
       setList(res.clients ?? [])
       setNotInstalled(false)
     } catch (e) {
@@ -77,7 +80,7 @@ export default function Clients() {
     } finally {
       setLoading(false)
     }
-  }, [message])
+  }, [message, apiPath])
 
   useEffect(() => {
     void load()
@@ -86,7 +89,7 @@ export default function Clients() {
   const create = async (v: CreateForm) => {
     setCreating(true)
     try {
-      await api('/api/clients', {
+      await api(apiPath('clients'), {
         method: 'POST',
         body: JSON.stringify({
           name: v.name,
@@ -108,7 +111,7 @@ export default function Clients() {
 
   const revoke = async (cn: string) => {
     try {
-      await api(`/api/clients/${encodeURIComponent(cn)}/revoke`, { method: 'POST' })
+      await api(apiPath(`clients/${encodeURIComponent(cn)}/revoke`), { method: 'POST' })
       message.success(`已吊销 ${cn},新连接立即被拒绝`)
       await load()
       await refresh() // 更新配额计数
@@ -119,7 +122,7 @@ export default function Clients() {
 
   const openShare = async (cn: string) => {
     try {
-      const data = await api<ShareResp>(`/api/clients/${encodeURIComponent(cn)}/share`, {
+      const data = await api<ShareResp>(apiPath(`clients/${encodeURIComponent(cn)}/share`), {
         method: 'POST',
       })
       setShare({ cn, data })
@@ -165,7 +168,7 @@ export default function Clients() {
                 <Button
                   size="small"
                   icon={<DownloadOutlined />}
-                  href={`/api/clients/${encodeURIComponent(c.cn)}/config`}
+                  href={apiPath(`clients/${encodeURIComponent(c.cn)}/config`)}
                 >
                   下载
                 </Button>
@@ -196,11 +199,11 @@ export default function Clients() {
       <Card>
         <Result
           status="warning"
-          title="OpenVPN 尚未安装"
-          subTitle="请先通过安装向导完成部署,再管理客户端证书"
+          title={isLocal ? 'OpenVPN 尚未安装' : '该节点尚未安装 OpenVPN'}
+          subTitle={isLocal ? '请先通过安装向导完成部署,再管理客户端证书' : '请在节点管理中完成该节点的远程安装'}
           extra={
-            <Link to="/install">
-              <Button type="primary">前往安装向导</Button>
+            <Link to={isLocal ? '/install' : '/nodes'}>
+              <Button type="primary">{isLocal ? '前往安装向导' : '前往节点管理'}</Button>
             </Link>
           }
         />
@@ -215,7 +218,7 @@ export default function Clients() {
         title={
           <Space>
             客户端证书
-            {me && !me.isAdmin && me.certLimit > 0 && (
+            {isLocal && me && !me.isAdmin && me.certLimit > 0 && (
               <Tag color={me.certsUsed >= me.certLimit ? 'red' : 'blue'}>
                 配额 {me.certsUsed}/{me.certLimit}
               </Tag>

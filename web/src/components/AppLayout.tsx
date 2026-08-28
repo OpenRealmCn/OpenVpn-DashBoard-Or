@@ -9,6 +9,7 @@ import {
   Layout,
   Menu,
   Modal,
+  Select,
   Space,
   Tag,
   Tooltip,
@@ -30,6 +31,7 @@ import {
 } from '@ant-design/icons'
 import { api, ApiError } from '../api/client'
 import { hasPerm, useSession } from '../session'
+import { TargetProvider, useTarget } from '../target'
 import { useTheme } from '../theme'
 import type { Perms } from '../types'
 
@@ -42,14 +44,17 @@ interface MenuDef {
 }
 
 const allMenus: MenuDef[] = [
-  { key: '/', icon: <DashboardOutlined />, label: '仪表盘', perm: 'view' },
+  { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
   { key: '/install', icon: <RocketOutlined />, label: '安装向导', perm: 'install' },
-  { key: '/clients', icon: <SafetyCertificateOutlined />, label: '客户端证书', perm: 'view' },
+  { key: '/clients', icon: <SafetyCertificateOutlined />, label: '客户端证书' },
   { key: '/maintenance', icon: <ToolOutlined />, label: '系统维护', perm: 'maintain' },
-  { key: '/nodes', icon: <ClusterOutlined />, label: '节点管理', adminOnly: true },
+  { key: '/nodes', icon: <ClusterOutlined />, label: '节点管理' },
   { key: '/users', icon: <TeamOutlined />, label: '用户管理', adminOnly: true },
   { key: '/settings', icon: <SettingOutlined />, label: '面板设置', adminOnly: true },
 ]
+
+// 管理目标选择器只在与目标相关的页面展示
+const targetAwarePages = ['/', '/clients']
 
 function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { message } = AntApp.useApp()
@@ -111,25 +116,28 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   )
 }
 
-export default function AppLayout() {
+function LayoutInner() {
   const nav = useNavigate()
   const loc = useLocation()
   const { session, refresh } = useSession()
   const { message } = AntApp.useApp()
   const { dark, toggle } = useTheme()
+  const { target, setTarget, options } = useTarget()
   const [pwOpen, setPwOpen] = useState(false)
 
-  const menus = useMemo(
-    () =>
-      allMenus.filter((m) => {
-        // 节点管理:管理员或持有节点授权的用户可见
-        if (m.key === '/nodes') return !!session.user?.isAdmin || (session.user?.nodeGrants?.length ?? 0) > 0
-        if (m.adminOnly) return session.user?.isAdmin
-        if (m.perm) return hasPerm(session, m.perm)
-        return true
-      }),
-    [session],
-  )
+  const menus = useMemo(() => {
+    const u = session.user
+    const nodeViewable = !!u?.isAdmin || (u?.nodeGrants ?? []).some((g) => g.full || g.perms.view)
+    return allMenus.filter((m) => {
+      // 节点管理:管理员或持有任意节点授权
+      if (m.key === '/nodes') return !!u?.isAdmin || (u?.nodeGrants?.length ?? 0) > 0
+      // 仪表盘/客户端证书:宿主机查看权限,或任一节点的查看授权(纯子节点管理员)
+      if (m.key === '/' || m.key === '/clients') return hasPerm(session, 'view') || nodeViewable
+      if (m.adminOnly) return u?.isAdmin
+      if (m.perm) return hasPerm(session, m.perm)
+      return true
+    })
+  }, [session])
 
   const selectedKey = useMemo(() => {
     const hit = menus.filter((m) => m.key !== '/').find((m) => loc.pathname.startsWith(m.key))
@@ -137,6 +145,7 @@ export default function AppLayout() {
   }, [loc.pathname, menus])
 
   const pageTitle = menus.find((m) => m.key === selectedKey)?.label ?? ''
+  const showTarget = targetAwarePages.includes(selectedKey) && options.length > 1
 
   const logout = async () => {
     try {
@@ -173,6 +182,11 @@ export default function AppLayout() {
             <Typography.Text strong style={{ fontSize: 15 }}>
               {pageTitle}
             </Typography.Text>
+            {showTarget && (
+              <Tooltip title="选择本页作用的管理目标">
+                <Select size="small" style={{ minWidth: 170 }} value={target} onChange={setTarget} options={options} />
+              </Tooltip>
+            )}
             {session.mode === 'mock' && <Tag color="orange">mock 演示模式</Tag>}
           </Space>
           <Space size={4}>
@@ -201,12 +215,20 @@ export default function AppLayout() {
           </Space>
         </Layout.Header>
         <Layout.Content style={{ padding: 24, maxWidth: 1240, width: '100%', margin: '0 auto' }}>
-          <div key={loc.pathname} className="page-enter">
+          <div key={loc.pathname + target} className="page-enter">
             <Outlet />
           </div>
         </Layout.Content>
       </Layout>
       <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
     </Layout>
+  )
+}
+
+export default function AppLayout() {
+  return (
+    <TargetProvider>
+      <LayoutInner />
+    </TargetProvider>
   )
 }

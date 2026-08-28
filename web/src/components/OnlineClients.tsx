@@ -3,6 +3,7 @@ import { App as AntApp, Badge, Button, Card, Popconfirm, Space, Table, Typograph
 import { DisconnectOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
+import { useTarget } from '../target'
 import type { OnlineClient } from '../types'
 
 export function formatBytes(n: number): string {
@@ -19,20 +20,24 @@ export function formatBytes(n: number): string {
 
 export default function OnlineClients({ canKick = true }: { canKick?: boolean }) {
   const { message } = AntApp.useApp()
+  const { apiPath } = useTarget()
   const [list, setList] = useState<OnlineClient[]>([])
   const [loading, setLoading] = useState(false)
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    try {
-      const res = await api<{ online: OnlineClient[] | null }>('/api/online')
-      setList(res.online ?? [])
-    } catch {
-      // 未安装或服务未运行时静默,证书表会给出引导
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }, [])
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true)
+      try {
+        const res = await api<{ online: OnlineClient[] | null }>(apiPath('online'))
+        setList(res.online ?? [])
+      } catch {
+        // 未安装或服务未运行时静默,证书表会给出引导
+      } finally {
+        if (!silent) setLoading(false)
+      }
+    },
+    [apiPath],
+  )
 
   useEffect(() => {
     void load()
@@ -42,7 +47,7 @@ export default function OnlineClients({ canKick = true }: { canKick?: boolean })
 
   const kick = async (cn: string) => {
     try {
-      await api(`/api/online/${encodeURIComponent(cn)}/kick`, { method: 'POST' })
+      await api(apiPath(`online/${encodeURIComponent(cn)}/kick`), { method: 'POST' })
       message.success(`已断开 ${cn} 的当前会话;如需永久禁用,请吊销其证书`)
       await load()
     } catch (e) {
