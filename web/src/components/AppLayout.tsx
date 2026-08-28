@@ -155,7 +155,7 @@ export default function AppLayout() {
           <span className="brand-name">OpenVpnTools</span>
         </div>
         <Menu
-          theme="dark"
+          theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
           items={menus.map(({ key, icon, label }) => ({ key, icon, label }))}

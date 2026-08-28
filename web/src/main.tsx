@@ -5,6 +5,10 @@ import zhCN from 'antd/locale/zh_CN'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { buildTheme, ThemeContext, useThemeState } from './theme'
+import '@fontsource/geist-sans/400.css'
+import '@fontsource/geist-sans/500.css'
+import '@fontsource/geist-sans/600.css'
+import '@fontsource/geist-mono/400.css'
 import './index.css'
 
 function Root() {

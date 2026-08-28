@@ -8,8 +8,8 @@ interface Props {
   children: ReactNode
 }
 
-// 仪表盘统计卡:左侧色块图标 + 右侧标题与内容,悬浮上浮
-export default function StatCard({ title, icon, tone = '#6366f1', children }: Props) {
+// 仪表盘统计卡:左侧色块图标 + 右侧标题与内容,悬浮时边框加深
+export default function StatCard({ title, icon, tone = '#0070f3', children }: Props) {
   return (
     <Card size="small" className="stat-card hover-lift" style={{ '--tone': tone } as CSSProperties}>
       <div className="stat-icon">{icon}</div>

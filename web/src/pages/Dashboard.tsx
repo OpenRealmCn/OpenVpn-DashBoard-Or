@@ -95,7 +95,7 @@ export default function Dashboard() {
   const svc = status?.openvpn.service
   const dns = status?.dns
   const ipfwd = status?.ipForward
-  const svcTone = !svc || !svc.exists ? '#94a3b8' : svc.active ? '#22c55e' : '#ef4444'
+  const svcTone = !svc || !svc.exists ? '#8f8f8f' : svc.active ? '#16a34a' : '#e5484d'
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }} className="stagger">
@@ -106,7 +106,7 @@ export default function Dashboard() {
               {!svc || !svc.exists ? (
                 <Badge status="default" text="未安装" />
               ) : svc.active ? (
-                <Badge status="processing" color="#22c55e" text="运行中" />
+                <Badge status="processing" color="#16a34a" text="运行中" />
               ) : (
                 <Badge status="error" text="已停止" />
               )}
@@ -115,7 +115,7 @@ export default function Dashboard() {
           </StatCard>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <StatCard title="IPv4 转发" icon={<ThunderboltOutlined />} tone={ipfwd?.runtime ? '#22c55e' : '#f59e0b'}>
+          <StatCard title="IPv4 转发" icon={<ThunderboltOutlined />} tone={ipfwd?.runtime ? '#16a34a' : '#f59e0b'}>
             <Space direction="vertical" size={6}>
               <Space wrap size={6}>
                 {ipfwd?.runtime ? (
@@ -140,7 +140,7 @@ export default function Dashboard() {
           </StatCard>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <StatCard title="操作系统" icon={<DesktopOutlined />} tone="#0ea5e9">
+          <StatCard title="操作系统" icon={<DesktopOutlined />} tone="#0070f3">
             <Typography.Text strong>{status?.os.pretty || '-'}</Typography.Text>
           </StatCard>
         </Col>
@@ -148,7 +148,7 @@ export default function Dashboard() {
           <StatCard
             title="运行模式"
             icon={<ExperimentOutlined />}
-            tone={status?.mode === 'linux' ? '#6366f1' : '#f59e0b'}
+            tone={status?.mode === 'linux' ? '#0070f3' : '#f59e0b'}
           >
             {status?.mode === 'linux' ? (
               <Tag color="blue">Linux 生产模式</Tag>
