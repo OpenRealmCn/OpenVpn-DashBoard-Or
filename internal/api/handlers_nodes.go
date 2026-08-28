@@ -17,6 +17,7 @@ import (
 	"openvpntools/internal/auth"
 	"openvpntools/internal/nodes"
 	"openvpntools/internal/openvpn"
+	"openvpntools/internal/users"
 	"openvpntools/internal/version"
 )
 
@@ -37,37 +38,87 @@ func (s *Server) handleNodePing(c *gin.Context) {
 	})
 }
 
-// nodeAllowed 管理员可管理全部节点;子用户仅限被分配的节点。
-func nodeAllowed(ident auth.Identity, id string) bool {
+// grantFor 返回用户对节点的授权;管理员返回 (nil, true) 表示全权。
+func grantFor(ident auth.Identity, id string) (*users.NodeGrant, bool) {
 	if ident.IsAdmin {
-		return true
+		return nil, true
 	}
-	for _, n := range ident.NodeIDs {
-		if n == id {
-			return true
+	for i := range ident.NodeGrants {
+		if ident.NodeGrants[i].NodeID == id {
+			return &ident.NodeGrants[i], true
 		}
 	}
-	return false
+	return nil, false
+}
+
+// permNeeded 把发往子节点的请求映射为所需的节点权限位;
+// 未识别的写操作与备份接口仅「完整管理」可执行(默认拒绝)。
+func permNeeded(method, rest string) func(g *users.NodeGrant) bool {
+	need := func(sel func(users.NodePerms) bool) func(*users.NodeGrant) bool {
+		return func(g *users.NodeGrant) bool {
+			if g == nil || g.Full {
+				return true
+			}
+			return sel(g.Perms)
+		}
+	}
+	fullOnly := func(g *users.NodeGrant) bool { return g == nil || g.Full }
+
+	rest = strings.TrimPrefix(rest, "/")
+	if i := strings.IndexByte(rest, '?'); i >= 0 {
+		rest = rest[:i]
+	}
+	switch {
+	case strings.HasPrefix(rest, "backup"):
+		return fullOnly
+	case method == http.MethodGet && strings.HasPrefix(rest, "clients/") && strings.HasSuffix(rest, "/config"):
+		return need(func(p users.NodePerms) bool { return p.CertCreate })
+	case method == http.MethodGet:
+		return need(func(p users.NodePerms) bool { return p.View })
+	case rest == "clients", strings.HasSuffix(rest, "/share"):
+		return need(func(p users.NodePerms) bool { return p.CertCreate })
+	case strings.HasSuffix(rest, "/revoke"):
+		return need(func(p users.NodePerms) bool { return p.CertRevoke })
+	case rest == "install", rest == "install/precheck":
+		return need(func(p users.NodePerms) bool { return p.Install })
+	case rest == "install/rollback":
+		return need(func(p users.NodePerms) bool { return p.Rollback })
+	case strings.HasPrefix(rest, "service/"):
+		return need(func(p users.NodePerms) bool { return p.Service })
+	case strings.HasPrefix(rest, "online/"):
+		return need(func(p users.NodePerms) bool { return p.Kick })
+	case strings.HasPrefix(rest, "update/"):
+		return need(func(p users.NodePerms) bool { return p.Upgrade })
+	case rest == "panel/restart":
+		return need(func(p users.NodePerms) bool { return p.PanelRestart })
+	case strings.HasPrefix(rest, "dns/"), strings.HasPrefix(rest, "system/"):
+		return need(func(p users.NodePerms) bool { return p.Upgrade })
+	default:
+		return fullOnly
+	}
 }
 
 type nodeDTO struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	URL         string       `json:"url"`
-	InsecureTLS bool         `json:"insecureTLS"`
-	AddedAt     time.Time    `json:"addedAt"`
-	Health      nodes.Health `json:"health"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	URL         string           `json:"url"`
+	InsecureTLS bool             `json:"insecureTLS"`
+	AddedAt     time.Time        `json:"addedAt"`
+	Health      nodes.Health     `json:"health"`
+	Grant       *users.NodeGrant `json:"grant,omitempty"` // 当前用户对该节点的授权;空 = 全权(管理员)
 }
 
 // handleNodeList 列出节点并并发健康探测(令牌绝不外传);子用户仅见被分配的节点。
 func (s *Server) handleNodeList(c *gin.Context) {
 	ident := identity(c)
 	list := s.nodes.List()
+	grants := map[string]*users.NodeGrant{}
 	if !ident.IsAdmin {
 		filtered := make([]nodes.Node, 0, len(list))
 		for _, n := range list {
-			if nodeAllowed(ident, n.ID) {
+			if g, ok := grantFor(ident, n.ID); ok {
 				filtered = append(filtered, n)
+				grants[n.ID] = g
 			}
 		}
 		list = filtered
@@ -75,7 +126,10 @@ func (s *Server) handleNodeList(c *gin.Context) {
 	out := make([]nodeDTO, len(list))
 	var wg sync.WaitGroup
 	for i, n := range list {
-		out[i] = nodeDTO{ID: n.ID, Name: n.Name, URL: n.URL, InsecureTLS: n.InsecureTLS, AddedAt: n.AddedAt}
+		out[i] = nodeDTO{
+			ID: n.ID, Name: n.Name, URL: n.URL, InsecureTLS: n.InsecureTLS,
+			AddedAt: n.AddedAt, Grant: grants[n.ID],
+		}
 		wg.Add(1)
 		go func(i int, n nodes.Node) {
 			defer wg.Done()
@@ -226,10 +280,16 @@ func (s *Server) handleNodeRegister(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// handleNodeProxy 把请求原样转发到子节点 /api/*(含 SSE 流式响应)。
+// handleNodeProxy 把请求原样转发到子节点 /api/*(含 SSE 流式响应);
+// 转发前按操作类别校验该用户在此节点上的授权。
 func (s *Server) handleNodeProxy(c *gin.Context) {
-	if !nodeAllowed(identity(c), c.Param("id")) {
+	g, ok := grantFor(identity(c), c.Param("id"))
+	if !ok {
 		abortErr(c, http.StatusForbidden, "没有该节点的管理权限")
+		return
+	}
+	if !permNeeded(c.Request.Method, c.Param("rest"))(g) {
+		abortErr(c, http.StatusForbidden, "没有在该节点执行此操作的权限")
 		return
 	}
 	n, err := s.nodes.Get(c.Param("id"))
@@ -321,8 +381,14 @@ func (s *Server) handleNodeBatch(c *gin.Context) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			res := batchResult{ID: id}
-			if !nodeAllowed(ident, id) {
+			g, ok := grantFor(ident, id)
+			if !ok {
 				res.Body = "没有该节点的管理权限"
+				results[i] = res
+				return
+			}
+			if !permNeeded(req.Method, req.Path)(g) {
+				res.Body = "没有在该节点执行此操作的权限"
 				results[i] = res
 				return
 			}

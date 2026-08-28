@@ -10,13 +10,13 @@ import (
 )
 
 type userDTO struct {
-	Username  string      `json:"username"`
-	Perms     users.Perms `json:"perms"`
-	CertLimit int         `json:"certLimit"`
-	CertsUsed int         `json:"certsUsed"`
-	NodeIDs   []string    `json:"nodeIds"`
-	Disabled  bool        `json:"disabled"`
-	CreatedAt string      `json:"createdAt"`
+	Username   string            `json:"username"`
+	Perms      users.Perms       `json:"perms"`
+	CertLimit  int               `json:"certLimit"`
+	CertsUsed  int               `json:"certsUsed"`
+	NodeGrants []users.NodeGrant `json:"nodeGrants"`
+	Disabled   bool              `json:"disabled"`
+	CreatedAt  string            `json:"createdAt"`
 }
 
 func userErrCode(err error) int {
@@ -40,7 +40,7 @@ func (s *Server) handleUserList(c *gin.Context) {
 		used, _ := s.clients.CountOwnedValid(c.Request.Context(), u.Username)
 		out = append(out, userDTO{
 			Username: u.Username, Perms: u.Perms, CertLimit: u.CertLimit,
-			CertsUsed: used, NodeIDs: u.NodeIDs, Disabled: u.Disabled,
+			CertsUsed: used, NodeGrants: u.NodeGrants, Disabled: u.Disabled,
 			CreatedAt: u.CreatedAt.Format("2006-01-02 15:04"),
 		})
 	}
@@ -48,11 +48,11 @@ func (s *Server) handleUserList(c *gin.Context) {
 }
 
 type userCreateReq struct {
-	Username  string      `json:"username"`
-	Password  string      `json:"password"`
-	Perms     users.Perms `json:"perms"`
-	CertLimit int         `json:"certLimit"`
-	NodeIDs   []string    `json:"nodeIds"`
+	Username   string            `json:"username"`
+	Password   string            `json:"password"`
+	Perms      users.Perms       `json:"perms"`
+	CertLimit  int               `json:"certLimit"`
+	NodeGrants []users.NodeGrant `json:"nodeGrants"`
 }
 
 func (s *Server) handleUserCreate(c *gin.Context) {
@@ -61,7 +61,7 @@ func (s *Server) handleUserCreate(c *gin.Context) {
 		abortErr(c, http.StatusBadRequest, "请求参数格式错误")
 		return
 	}
-	if err := s.users.Create(req.Username, req.Password, req.Perms, req.CertLimit, req.NodeIDs); err != nil {
+	if err := s.users.Create(req.Username, req.Password, req.Perms, req.CertLimit, req.NodeGrants); err != nil {
 		abortErr(c, userErrCode(err), err.Error())
 		return
 	}
@@ -69,11 +69,11 @@ func (s *Server) handleUserCreate(c *gin.Context) {
 }
 
 type userUpdateReq struct {
-	Perms     *users.Perms `json:"perms"`
-	CertLimit *int         `json:"certLimit"`
-	NodeIDs   *[]string    `json:"nodeIds"`
-	Disabled  *bool        `json:"disabled"`
-	Password  string       `json:"password"` // 非空 = 重置密码
+	Perms      *users.Perms       `json:"perms"`
+	CertLimit  *int               `json:"certLimit"`
+	NodeGrants *[]users.NodeGrant `json:"nodeGrants"`
+	Disabled   *bool              `json:"disabled"`
+	Password   string             `json:"password"` // 非空 = 重置密码
 }
 
 func (s *Server) handleUserUpdate(c *gin.Context) {
@@ -90,8 +90,8 @@ func (s *Server) handleUserUpdate(c *gin.Context) {
 		if req.CertLimit != nil && *req.CertLimit >= 0 {
 			u.CertLimit = *req.CertLimit
 		}
-		if req.NodeIDs != nil {
-			u.NodeIDs = *req.NodeIDs
+		if req.NodeGrants != nil {
+			u.NodeGrants = *req.NodeGrants
 		}
 		if req.Disabled != nil {
 			u.Disabled = *req.Disabled

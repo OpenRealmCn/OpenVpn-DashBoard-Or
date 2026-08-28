@@ -7,13 +7,31 @@ export interface Perms {
   maintain: boolean
 }
 
+export interface NodePerms {
+  view: boolean
+  certCreate: boolean
+  certRevoke: boolean
+  install: boolean
+  rollback: boolean
+  service: boolean
+  kick: boolean
+  upgrade: boolean
+  panelRestart: boolean
+}
+
+export interface NodeGrant {
+  nodeId: string
+  full: boolean
+  perms: NodePerms
+}
+
 export interface PanelUser {
   username: string
   isAdmin: boolean
   perms: Perms
   certLimit: number
   certsUsed: number
-  nodeIds: string[] | null
+  nodeGrants: NodeGrant[] | null
 }
 
 export interface Session {
@@ -28,7 +46,7 @@ export interface UserRow {
   perms: Perms
   certLimit: number
   certsUsed: number
-  nodeIds: string[] | null
+  nodeGrants: NodeGrant[] | null
   disabled: boolean
   createdAt: string
 }
@@ -195,6 +213,7 @@ export interface NodeRow {
   insecureTLS: boolean
   addedAt: string
   health: NodeHealth
+  grant?: NodeGrant | null
 }
 
 export interface JoinCodeResp {

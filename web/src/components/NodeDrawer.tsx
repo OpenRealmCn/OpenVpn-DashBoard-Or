@@ -28,7 +28,7 @@ import {
 import { CheckCircleTwoTone, CloseCircleTwoTone, DownloadOutlined, PlusOutlined, StopOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
-import type { ClientCert, InstallState, NodeRow, PrecheckReport, StepStatus } from '../types'
+import type { ClientCert, InstallState, NodePerms, NodeRow, PrecheckReport, StepStatus } from '../types'
 
 export const hostOf = (url: string): string => {
   try {
@@ -37,6 +37,10 @@ export const hostOf = (url: string): string => {
     return url
   }
 }
+
+// canNode 当前用户是否可在该节点执行某类操作;无 grant(管理员)或完整管理时放行
+export const canNode = (n: NodeRow, k: keyof NodePerms): boolean =>
+  !n.grant || n.grant.full || !!n.grant.perms?.[k]
 
 const installDefaults = {
   port: 1194,
@@ -138,7 +142,7 @@ export function RemoteInstallModal({
   const { message, modal } = AntApp.useApp()
   const [form] = Form.useForm()
   const [running, setRunning] = useState(false)
-  const candidates = nodes.filter((n) => n.health.reachable && !n.health.installed)
+  const candidates = nodes.filter((n) => n.health.reachable && !n.health.installed && canNode(n, 'install'))
 
   const submit = async () => {
     const v = await form.validateFields()
@@ -270,6 +274,10 @@ function InstallPanel({ node, refreshList }: { node: NodeRow; refreshList: () =>
     }
   }
 
+  if (!canNode(node, 'install') && !canNode(node, 'rollback')) {
+    return <Alert type="info" showIcon message="您没有在该节点执行安装部署的权限" />
+  }
+
   if (!state) return <Card loading size="small" />
 
   if (state.installed) {
@@ -302,9 +310,11 @@ function InstallPanel({ node, refreshList }: { node: NodeRow; refreshList: () =>
           message="上次安装失败,且部分回滚未复原"
           description={job.error}
           action={
-            <Button danger loading={busy === 'rb'} onClick={() => call('rb', 'install/rollback', {}, '回滚完成')}>
-              重试回滚
-            </Button>
+            canNode(node, 'rollback') && (
+              <Button danger loading={busy === 'rb'} onClick={() => call('rb', 'install/rollback', {}, '回滚完成')}>
+                重试回滚
+              </Button>
+            )
           }
         />
       )}
@@ -314,9 +324,11 @@ function InstallPanel({ node, refreshList }: { node: NodeRow; refreshList: () =>
           showIcon
           message="检测到未完成的安装残留,须先回滚才能重新安装"
           action={
-            <Button danger loading={busy === 'rb'} onClick={() => call('rb', 'install/rollback', {}, '回滚完成')}>
-              立即回滚
-            </Button>
+            canNode(node, 'rollback') && (
+              <Button danger loading={busy === 'rb'} onClick={() => call('rb', 'install/rollback', {}, '回滚完成')}>
+                立即回滚
+              </Button>
+            )
           }
         />
       )}
@@ -465,19 +477,27 @@ function CertsPanel({ node }: { node: NodeRow }) {
       render: (_, c) =>
         c.status === 'V' ? (
           <Space>
-            <Button size="small" icon={<DownloadOutlined />} href={`/api/nodes/${node.id}/proxy/clients/${encodeURIComponent(c.cn)}/config`}>
-              下载
-            </Button>
-            <Popconfirm
-              title={`吊销 ${c.cn}?`}
-              description="吊销后该证书立即无法建立新连接,且不可恢复。"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => revoke(c.cn)}
-            >
-              <Button size="small" danger icon={<StopOutlined />}>
-                吊销
+            {canNode(node, 'certCreate') && (
+              <Button
+                size="small"
+                icon={<DownloadOutlined />}
+                href={`/api/nodes/${node.id}/proxy/clients/${encodeURIComponent(c.cn)}/config`}
+              >
+                下载
               </Button>
-            </Popconfirm>
+            )}
+            {canNode(node, 'certRevoke') && (
+              <Popconfirm
+                title={`吊销 ${c.cn}?`}
+                description="吊销后该证书立即无法建立新连接,且不可恢复。"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => revoke(c.cn)}
+              >
+                <Button size="small" danger icon={<StopOutlined />}>
+                  吊销
+                </Button>
+              </Popconfirm>
+            )}
           </Space>
         ) : null,
     },
@@ -486,9 +506,11 @@ function CertsPanel({ node }: { node: NodeRow }) {
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} disabled={!node.health.installed}>
-          新建证书
-        </Button>
+        {canNode(node, 'certCreate') && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)} disabled={!node.health.installed}>
+            新建证书
+          </Button>
+        )}
         <Button onClick={load} loading={loading}>
           刷新
         </Button>
@@ -606,7 +628,7 @@ export default function NodeDrawer({
                     {new Date(node.addedAt).toLocaleString()}
                   </Descriptions.Item>
                 </Descriptions>
-                {h.installed && (
+                {h.installed && canNode(node, 'service') && (
                   <Card size="small" title="服务控制">
                     <Space wrap>
                       <Button loading={acting === 'start'} disabled={h.serviceActive} onClick={() => ctl('start')}>

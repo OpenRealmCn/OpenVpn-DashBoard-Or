@@ -4,6 +4,8 @@ import {
   Button,
   Card,
   Checkbox,
+  Divider,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -19,7 +21,7 @@ import {
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { api, ApiError } from '../api/client'
-import type { Perms, UserRow } from '../types'
+import type { NodeGrant, NodePerms, Perms, UserRow } from '../types'
 
 const permOptions: { key: keyof Perms; label: string }[] = [
   { key: 'view', label: '查看' },
@@ -39,8 +41,48 @@ interface FormValues {
   password?: string
   permKeys: (keyof Perms)[]
   certLimit: number
-  nodeIds: string[]
   disabled?: boolean
+}
+
+const nodePermOptions: { key: keyof NodePerms; label: string }[] = [
+  { key: 'view', label: '查看' },
+  { key: 'certCreate', label: '创建证书' },
+  { key: 'certRevoke', label: '吊销证书' },
+  { key: 'install', label: '安装部署' },
+  { key: 'rollback', label: '失败回滚' },
+  { key: 'service', label: '服务控制' },
+  { key: 'kick', label: '断开客户端' },
+  { key: 'upgrade', label: '升级维护' },
+  { key: 'panelRestart', label: '重启面板' },
+]
+
+const emptyNodePerms = (): NodePerms => ({
+  view: false, certCreate: false, certRevoke: false, install: false, rollback: false,
+  service: false, kick: false, upgrade: false, panelRestart: false,
+})
+
+// 权限模板:「完整管理」即整体管理模板,其余为常用预设,套用后仍可微调
+const grantTemplates: { key: string; label: string; full: boolean; perms: Partial<NodePerms> }[] = [
+  { key: 'full', label: '完整管理', full: true, perms: {} },
+  { key: 'readonly', label: '只读', full: false, perms: { view: true } },
+  { key: 'cert', label: '证书管理员', full: false, perms: { view: true, certCreate: true, certRevoke: true } },
+  {
+    key: 'ops',
+    label: '运维',
+    full: false,
+    perms: { view: true, service: true, kick: true, rollback: true, upgrade: true, panelRestart: true },
+  },
+]
+
+const permKeysOf = (p: NodePerms): (keyof NodePerms)[] =>
+  nodePermOptions.filter((o) => p[o.key]).map((o) => o.key)
+
+const toNodePerms = (keys: (keyof NodePerms)[]): NodePerms => {
+  const p = emptyNodePerms()
+  keys.forEach((k) => {
+    p[k] = true
+  })
+  return p
 }
 
 function toPerms(keys: (keyof Perms)[]): Perms {
@@ -59,6 +101,7 @@ export default function Users() {
   const [editing, setEditing] = useState<UserRow | null>(null) // null=关闭,username=''=新建
   const [saving, setSaving] = useState(false)
   const [nodeOpts, setNodeOpts] = useState<{ label: string; value: string }[]>([])
+  const [grants, setGrants] = useState<NodeGrant[]>([])
   const [form] = Form.useForm<FormValues>()
 
   useEffect(() => {
@@ -85,10 +128,11 @@ export default function Users() {
 
   const openCreate = () => {
     form.setFieldsValue({
-      username: '', password: '', permKeys: ['view', 'certCreate'], certLimit: 5, nodeIds: [], disabled: false,
+      username: '', password: '', permKeys: ['view', 'certCreate'], certLimit: 5, disabled: false,
     })
+    setGrants([])
     setEditing({
-      username: '', perms: toPerms([]), certLimit: 0, certsUsed: 0, nodeIds: [], disabled: false, createdAt: '',
+      username: '', perms: toPerms([]), certLimit: 0, certsUsed: 0, nodeGrants: [], disabled: false, createdAt: '',
     })
   }
 
@@ -98,9 +142,9 @@ export default function Users() {
       password: '',
       permKeys: permOptions.filter((p) => u.perms[p.key]).map((p) => p.key),
       certLimit: u.certLimit,
-      nodeIds: u.nodeIds ?? [],
       disabled: u.disabled,
     })
+    setGrants((u.nodeGrants ?? []).map((g) => ({ ...g, perms: { ...g.perms } })))
     setEditing(u)
   }
 
@@ -114,7 +158,7 @@ export default function Users() {
           method: 'POST',
           body: JSON.stringify({
             username: v.username, password: v.password,
-            perms: toPerms(v.permKeys), certLimit: v.certLimit, nodeIds: v.nodeIds ?? [],
+            perms: toPerms(v.permKeys), certLimit: v.certLimit, nodeGrants: grants,
           }),
         })
         message.success('子用户已创建')
@@ -122,7 +166,7 @@ export default function Users() {
         await api(`/api/users/${encodeURIComponent(editing!.username)}`, {
           method: 'PUT',
           body: JSON.stringify({
-            perms: toPerms(v.permKeys), certLimit: v.certLimit, nodeIds: v.nodeIds ?? [],
+            perms: toPerms(v.permKeys), certLimit: v.certLimit, nodeGrants: grants,
             disabled: v.disabled, password: v.password || '',
           }),
         })
@@ -176,17 +220,21 @@ export default function Users() {
       render: (_, u) => (u.certLimit > 0 ? `${u.certsUsed} / ${u.certLimit}` : `${u.certsUsed} / 不限`),
     },
     {
-      title: '分配节点',
+      title: '节点授权',
       key: 'nodes',
-      width: 160,
+      width: 200,
       render: (_, u) => {
-        const ids = u.nodeIds ?? []
-        if (ids.length === 0) return '-'
+        const gs = u.nodeGrants ?? []
+        if (gs.length === 0) return '-'
         return (
           <Space size={4} wrap>
-            {ids.map((id) => {
-              const opt = nodeOpts.find((o) => o.value === id)
-              return <Tag key={id}>{opt?.label ?? id}</Tag>
+            {gs.map((g) => {
+              const opt = nodeOpts.find((o) => o.value === g.nodeId)
+              return (
+                <Tag key={g.nodeId} color={g.full ? 'geekblue' : undefined}>
+                  {(opt?.label ?? g.nodeId) + (g.full ? ' · 完整管理' : ' · 部分权限')}
+                </Tag>
+              )
             })}
           </Space>
         )
@@ -279,18 +327,77 @@ export default function Users() {
           <Form.Item name="certLimit" label="有效证书数量上限(0 = 不限)" rules={[{ required: true }]}>
             <InputNumber min={0} max={1000} style={{ width: 180 }} />
           </Form.Item>
-          <Form.Item
-            name="nodeIds"
-            label="分配节点"
-            tooltip="被分配节点的用户可在「节点管理」中查看并操作对应子节点"
-          >
-            <Select
-              mode="multiple"
-              allowClear
-              placeholder={nodeOpts.length ? '选择可管理的子节点' : '暂无子节点可分配'}
-              options={nodeOpts}
+          <Divider orientation="left" plain style={{ fontSize: 13, margin: '8px 0' }}>
+            节点授权
+          </Divider>
+          <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 8 }}>
+            <Select<string | null>
+              style={{ width: 280 }}
+              placeholder={nodeOpts.length ? '添加节点授权' : '暂无子节点可分配'}
+              value={null}
+              options={nodeOpts.filter((o) => !grants.some((g) => g.nodeId === o.value))}
+              onSelect={(id) => {
+                if (typeof id !== 'string') return
+                setGrants([...grants, { nodeId: id, full: false, perms: { ...emptyNodePerms(), view: true } }])
+              }}
             />
-          </Form.Item>
+            {grants.map((g, idx) => (
+              <Card size="small" key={g.nodeId}>
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  <Space wrap>
+                    <Typography.Text strong>
+                      {nodeOpts.find((o) => o.value === g.nodeId)?.label ?? g.nodeId}
+                    </Typography.Text>
+                    <Dropdown
+                      menu={{
+                        items: grantTemplates.map((t) => ({ key: t.key, label: t.label })),
+                        onClick: ({ key }) => {
+                          const t = grantTemplates.find((x) => x.key === key)!
+                          const next = [...grants]
+                          next[idx] = {
+                            nodeId: g.nodeId,
+                            full: t.full,
+                            perms: { ...emptyNodePerms(), ...t.perms },
+                          }
+                          setGrants(next)
+                        },
+                      }}
+                    >
+                      <Button size="small">套用模板</Button>
+                    </Dropdown>
+                    <Switch
+                      checkedChildren="完整管理"
+                      unCheckedChildren="细分权限"
+                      checked={g.full}
+                      onChange={(full) => {
+                        const next = [...grants]
+                        next[idx] = { ...g, full }
+                        setGrants(next)
+                      }}
+                    />
+                    <Button
+                      size="small"
+                      danger
+                      type="text"
+                      icon={<DeleteOutlined />}
+                      onClick={() => setGrants(grants.filter((_, i) => i !== idx))}
+                    />
+                  </Space>
+                  {!g.full && (
+                    <Checkbox.Group
+                      options={nodePermOptions.map((o) => ({ label: o.label, value: o.key }))}
+                      value={permKeysOf(g.perms)}
+                      onChange={(keys) => {
+                        const next = [...grants]
+                        next[idx] = { ...g, perms: toNodePerms(keys as (keyof NodePerms)[]) }
+                        setGrants(next)
+                      }}
+                    />
+                  )}
+                </Space>
+              </Card>
+            ))}
+          </Space>
           {!isCreate && (
             <Form.Item name="disabled" label="禁用账号" valuePropName="checked">
               <Switch />

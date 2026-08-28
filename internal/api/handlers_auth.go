@@ -27,12 +27,12 @@ func (s *Server) handleSession(c *gin.Context) {
 			resp["authenticated"] = true
 			used, _ := s.clients.CountOwnedValid(c.Request.Context(), ident.Username)
 			resp["user"] = gin.H{
-				"username":  ident.Username,
-				"isAdmin":   ident.IsAdmin,
-				"perms":     ident.Perms,
-				"certLimit": ident.CertLimit,
-				"certsUsed": used,
-				"nodeIds":   ident.NodeIDs,
+				"username":   ident.Username,
+				"isAdmin":    ident.IsAdmin,
+				"perms":      ident.Perms,
+				"certLimit":  ident.CertLimit,
+				"certsUsed":  used,
+				"nodeGrants": ident.NodeGrants,
 			}
 		}
 	}

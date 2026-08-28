@@ -26,14 +26,45 @@ type Perms struct {
 	Maintain   bool `json:"maintain"`   // 服务启停/版本升级/DNS Stub/ip_forward
 }
 
+// NodePerms 子节点上的细分操作权限。
+type NodePerms struct {
+	View         bool `json:"view"`         // 查看状态、在线客户端与证书列表
+	CertCreate   bool `json:"certCreate"`   // 创建证书与下载配置
+	CertRevoke   bool `json:"certRevoke"`   // 吊销证书
+	Install      bool `json:"install"`      // 远程安装与预检
+	Rollback     bool `json:"rollback"`     // 安装失败回滚
+	Service      bool `json:"service"`      // OpenVPN 服务启停与重启
+	Kick         bool `json:"kick"`         // 断开在线客户端
+	Upgrade      bool `json:"upgrade"`      // 组件升级与系统维护(DNS/转发等)
+	PanelRestart bool `json:"panelRestart"` // 重启子节点面板进程
+}
+
+// NodeGrant 一条节点授权;Full 即「完整管理」模板:忽略 Perms,全部放行。
+type NodeGrant struct {
+	NodeID string    `json:"nodeId"`
+	Full   bool      `json:"full"`
+	Perms  NodePerms `json:"perms"`
+}
+
 type User struct {
-	Username  string    `json:"username"`
-	Hash      string    `json:"hash"` // bcrypt,仅存储文件用,API 层不得外传
-	Perms     Perms     `json:"perms"`
-	CertLimit int       `json:"certLimit"` // 有效证书数上限,0 = 不限
-	NodeIDs   []string  `json:"nodeIds"`   // 分配给该用户管理的子节点
-	Disabled  bool      `json:"disabled"`
-	CreatedAt time.Time `json:"createdAt"`
+	Username   string      `json:"username"`
+	Hash       string      `json:"hash"` // bcrypt,仅存储文件用,API 层不得外传
+	Perms      Perms       `json:"perms"`
+	CertLimit  int         `json:"certLimit"`         // 有效证书数上限,0 = 不限
+	NodeIDs    []string    `json:"nodeIds,omitempty"` // 旧版字段:加载时迁移为完整管理授权
+	NodeGrants []NodeGrant `json:"nodeGrants"`        // 节点授权(细分权限或完整管理)
+	Disabled   bool        `json:"disabled"`
+	CreatedAt  time.Time   `json:"createdAt"`
+}
+
+// normalize 旧数据迁移:nodeIds 等同「完整管理」授权。
+func (u *User) normalize() {
+	if len(u.NodeGrants) == 0 && len(u.NodeIDs) > 0 {
+		for _, id := range u.NodeIDs {
+			u.NodeGrants = append(u.NodeGrants, NodeGrant{NodeID: id, Full: true})
+		}
+	}
+	u.NodeIDs = nil
 }
 
 var (
@@ -64,6 +95,7 @@ func Load(path string) (*Store, error) {
 		}
 	}
 	for _, u := range list {
+		u.normalize()
 		s.users[u.Username] = u
 	}
 	return s, nil
@@ -79,6 +111,7 @@ func (s *Store) Reload() error {
 	defer s.mu.Unlock()
 	s.users = map[string]*User{}
 	for _, u := range list {
+		u.normalize()
 		s.users[u.Username] = u
 	}
 	return nil
@@ -115,7 +148,7 @@ func (s *Store) Get(username string) (User, error) {
 	return *u, nil
 }
 
-func (s *Store) Create(username, password string, perms Perms, certLimit int, nodeIDs []string) error {
+func (s *Store) Create(username, password string, perms Perms, certLimit int, grants []NodeGrant) error {
 	if !usernameRe.MatchString(username) {
 		return ErrBadName
 	}
@@ -136,7 +169,7 @@ func (s *Store) Create(username, password string, perms Perms, certLimit int, no
 	}
 	s.users[username] = &User{
 		Username: username, Hash: string(hash), Perms: perms,
-		CertLimit: max(certLimit, 0), NodeIDs: nodeIDs, CreatedAt: time.Now(),
+		CertLimit: max(certLimit, 0), NodeGrants: grants, CreatedAt: time.Now(),
 	}
 	return s.saveLocked()
 }
