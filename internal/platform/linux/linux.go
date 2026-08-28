@@ -134,7 +134,7 @@ func (l *Linux) WriteSysctlD(file, key, value string) error {
 }
 
 func (l *Linux) AptInstall(ctx context.Context, pkgs ...string) error {
-	argv := append([]string{"apt-get", "install", "-y", "--no-install-recommends"}, pkgs...)
+	argv := append(platform.AptGet("install", "-y", "--no-install-recommends"), pkgs...)
 	res, err := l.Run(ctx, platform.RunOpt{
 		Argv:    argv,
 		Env:     []string{"DEBIAN_FRONTEND=noninteractive"},

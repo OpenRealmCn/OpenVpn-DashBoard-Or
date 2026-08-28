@@ -127,11 +127,11 @@ func (u *Manager) readMarker() string {
 
 func (u *Manager) aptUpgradable(ctx context.Context) (string, error) {
 	env := []string{"DEBIAN_FRONTEND=noninteractive"}
-	if res, err := u.plat.Run(ctx, platform.RunOpt{Argv: []string{"apt-get", "update"}, Env: env, Timeout: 5 * time.Minute}); err != nil || res.ExitCode != 0 {
+	if res, err := u.plat.Run(ctx, platform.RunOpt{Argv: platform.AptGet("update"), Env: env, Timeout: 5 * time.Minute}); err != nil || res.ExitCode != 0 {
 		return "", errors.New("apt-get update 失败")
 	}
 	res, err := u.plat.Run(ctx, platform.RunOpt{
-		Argv: []string{"apt-get", "-s", "install", "--only-upgrade", "openvpn"},
+		Argv: platform.AptGet("-s", "install", "--only-upgrade", "openvpn"),
 		Env:  env, Timeout: time.Minute,
 	})
 	if err != nil || res.ExitCode != 0 {
@@ -203,7 +203,7 @@ func (u *Manager) UpgradeOpenVPN(ctx context.Context, logf func(string, ...any))
 	}
 	logf("apt-get install --only-upgrade -y openvpn …")
 	res, err := u.plat.Run(ctx, platform.RunOpt{
-		Argv: []string{"apt-get", "install", "--only-upgrade", "-y", "openvpn"},
+		Argv: platform.AptGet("install", "--only-upgrade", "-y", "openvpn"),
 		Env:  []string{"DEBIAN_FRONTEND=noninteractive"},
 		Timeout: 10 * time.Minute,
 	})

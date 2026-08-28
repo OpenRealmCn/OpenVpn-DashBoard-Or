@@ -38,6 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/OpenRealmCn/OpenVpn-DashBoard-Or/ma
 
 - 交互式安装向导:自定义端口、UDP/TCP、VPN 网段、可选 IPv6(NAT66)、五种客户端 DNS 模式,SSE 实时日志
 - write-ahead 回滚 journal:任一步失败按 LIFO 逆序恢复原状(文件、软件包、sysctl、防火墙规则、DNS 改动),面板重启后残留可继续回滚
+- apt 全链路等锁:所有 apt 操作带 `DPkg::Lock::Timeout`(unattended-upgrades 等自动任务持锁时等待而非报错);预检探测并报出 dpkg 锁持有进程;回滚卸包失败自动 `dpkg --configure -a` 修复后重试
 - 现代加密默认值:`tls-crypt`、AEAD(AES-GCM)、EC 证书、`dh none`、CRL 校验
 
 **DNS 安全(不做鲁莽操作)**
@@ -153,6 +154,7 @@ install.sh          在线管理脚本(安装/更新/卸载/状态)
 - [ ] 真机扫码导入 `.ovpn`,连接成功;同一链接第二次访问返回 410
 - [ ] 带密码证书导入时要求输入密码;吊销后原客户端无法建立新连接
 - [ ] 人为制造失败(占用端口/断网)→ 自动回滚后 `/etc/openvpn`、`/etc/sysctl.d`、iptables、resolved drop-in 与 `/etc/resolv.conf` 均复原
+- [ ] 系统自动更新(unattended-upgrades)持锁期间:预检报出持有进程与 PID;安装/回滚等待锁释放后正常完成
 - [ ] dnsmasq 或 `nc -lup 53` 占用 53 时,预检正确归类且不停止对方进程
 - [ ] 端口选 53 且被 resolved Stub 占用:未勾选自动释放时预检给出提示;勾选后安装成功、本机解析正常,回滚后 Stub 与 `resolv.conf` 复原
 - [ ] 仪表盘关闭 DNS Stub(drop-in 生成、53 释放、解析正常),恢复原状成功;节点详情「DNS Stub / 53 端口」页对子节点可完成同样操作

@@ -122,15 +122,32 @@ func (r *Rollbacker) undo(ctx context.Context, e JournalEntry) error {
 		if len(p.Pkgs) == 0 {
 			return nil
 		}
-		argv := append([]string{"apt-get", "remove", "-y"}, p.Pkgs...)
-		res, err := r.Plat.Run(ctx, platform.RunOpt{
-			Argv: argv, Env: []string{"DEBIAN_FRONTEND=noninteractive"}, Timeout: 10 * time.Minute,
-		})
+		env := []string{"DEBIAN_FRONTEND=noninteractive"}
+		remove := func() (platform.RunResult, error) {
+			return r.Plat.Run(ctx, platform.RunOpt{
+				Argv: append(platform.AptGet("remove", "-y"), p.Pkgs...),
+				Env:  env, Timeout: 10 * time.Minute,
+			})
+		}
+		res, err := remove()
 		if err != nil {
 			return err
 		}
 		if res.ExitCode != 0 {
-			return fmt.Errorf("apt-get remove 退出码 %d", res.ExitCode)
+			// 安装被打断(锁竞争、断电等)可能留下 dpkg 半配置状态,
+			// 先修复自己造成的残局再重试一次卸载
+			r.Log("apt-get remove 退出码 %d,尝试 dpkg --configure -a 后重试 …", res.ExitCode)
+			if cres, cerr := r.Plat.Run(ctx, platform.RunOpt{
+				Argv: []string{"dpkg", "--configure", "-a"}, Env: env, Timeout: 10 * time.Minute,
+			}); cerr != nil || cres.ExitCode != 0 {
+				r.Log("dpkg --configure -a 未成功(继续重试卸载)")
+			}
+			if res, err = remove(); err != nil {
+				return err
+			}
+			if res.ExitCode != 0 {
+				return fmt.Errorf("apt-get remove 退出码 %d: %s", res.ExitCode, tailStr(res.Stderr, 300))
+			}
 		}
 		return nil
 

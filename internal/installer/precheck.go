@@ -80,6 +80,21 @@ func RunPrecheck(ctx context.Context, plat platform.Platform, dns *dnsguard.Guar
 		add("bash", true, "可用")
 	}
 
+	// dpkg/apt 锁:新装系统开机后 unattended-upgrades 等常持锁数分钟,
+	// 此时任何 apt 操作都会失败,提前在预检阶段拦下
+	if simulate || runtime.GOOS != "linux" {
+		add("dpkg/apt 锁", true, "mock 模式跳过")
+	} else if pid, comm, held := dpkgLockHolder(); held {
+		if comm == "" {
+			comm = "未知进程"
+		}
+		add("dpkg/apt 锁", false, fmt.Sprintf(
+			"dpkg 锁被 %s(PID %d)持有,通常是系统自动更新,几分钟后自行结束;安装时 apt 最多等锁 %d 秒,建议稍后重新预检",
+			comm, pid, platform.AptLockWaitSec))
+	} else {
+		add("dpkg/apt 锁", true, "空闲")
+	}
+
 	// 端口占用;端口 53 仅被 resolved 的 DNS Stub 占用时可由安装器自动释放
 	ports, err := plat.ListenPorts(ctx)
 	if err != nil {

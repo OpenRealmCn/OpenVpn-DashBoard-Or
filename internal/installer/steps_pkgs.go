@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	"openvpntools/internal/platform"
 )
 
 var ovpnVerRe = regexp.MustCompile(`OpenVPN (\d+\.\d+)`)
@@ -15,7 +17,7 @@ func stepPackages() Step {
 			c.Log("(mock) 跳过 apt-get update")
 		} else {
 			c.Log("apt-get update …")
-			if _, err := runLogged(c, aptEnv, 10*time.Minute, "apt-get", "update"); err != nil {
+			if _, err := runLogged(c, aptEnv, 10*time.Minute, platform.AptGet("update")...); err != nil {
 				return err
 			}
 		}

@@ -6,10 +6,21 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
 const defaultRunTimeout = 5 * time.Minute
+
+// AptLockWaitSec 是 apt 等待 dpkg 锁的秒数。新装系统开机后
+// unattended-upgrades 等自动任务常持锁数分钟,不等锁会让
+// 安装与回滚直接死在 "Could not get lock /var/lib/dpkg/lock-frontend" 上。
+const AptLockWaitSec = 300
+
+// AptGet 构造带 dpkg 锁等待的 apt-get 命令行;所有 apt 调用统一经此入口。
+func AptGet(args ...string) []string {
+	return append([]string{"apt-get", "-o", "DPkg::Lock::Timeout=" + strconv.Itoa(AptLockWaitSec)}, args...)
+}
 
 // ExecRun 以 argv 数组直接执行外部命令(绝不经过 shell)。
 // 命令跑完但退出码非 0 时不视为 error,由调用方检查 ExitCode;
